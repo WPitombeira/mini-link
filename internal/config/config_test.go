@@ -54,3 +54,23 @@ MINI_LINK_LINK_1_ICON=globe
 		t.Fatalf("icon = %q", cfg.Links[0].Icon)
 	}
 }
+
+func TestLoadRejectsUnknownIcon(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.json")
+	if err := os.WriteFile(path, []byte(`{
+  "name": "Bad Icon",
+  "links": [
+    {
+      "title": "Website",
+      "url": "https://example.com",
+      "icon": "missing-brand"
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected unknown icon error")
+	}
+}

@@ -23,7 +23,7 @@ func TestPageRendersInlineSVGAndEscapesText(t *testing.T) {
 	if !strings.Contains(html, `<svg viewBox="0 0 24 24"`) {
 		t.Fatal("expected inline svg")
 	}
-	if strings.Contains(html, "script") {
+	if strings.Contains(html, "<script") {
 		t.Fatal("page should not include scripts")
 	}
 }

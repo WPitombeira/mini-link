@@ -172,6 +172,9 @@ func validate(args []string) error {
 }
 
 func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string, modified time.Time, ttl int) {
+	w.Header().Set("Cache-Control", cacheControl(ttl))
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
 	if match := r.Header.Get("If-None-Match"); match == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -184,9 +187,6 @@ func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", cacheControl(ttl))
-	w.Header().Set("ETag", etag)
-	w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(page)
 }

@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/WPitombeira/mini-link/internal/icons"
 )
 
 type Config struct {
@@ -60,18 +62,19 @@ func Load(path string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".json":
+	lowerPath := strings.ToLower(path)
+	switch {
+	case filepath.Ext(lowerPath) == ".json":
 		if err := json.Unmarshal(raw, &cfg); err != nil {
 			return Config{}, fmt.Errorf("parse json config: %w", err)
 		}
-	case ".yaml", ".yml":
+	case filepath.Ext(lowerPath) == ".yaml" || filepath.Ext(lowerPath) == ".yml":
 		parsed, err := parseYAML(string(raw))
 		if err != nil {
 			return Config{}, fmt.Errorf("parse yaml config: %w", err)
 		}
 		cfg = merge(cfg, parsed)
-	case ".env":
+	case filepath.Ext(lowerPath) == ".env" || strings.HasSuffix(lowerPath, ".env.example"):
 		env, err := parseDotEnv(string(raw))
 		if err != nil {
 			return Config{}, fmt.Errorf("parse env config: %w", err)
@@ -127,6 +130,9 @@ func normalize(cfg Config) (Config, error) {
 		}
 		if cfg.Links[i].Icon == "" {
 			cfg.Links[i].Icon = "link"
+		}
+		if _, ok := icons.Get(cfg.Links[i].Icon); !ok {
+			return Config{}, fmt.Errorf("links[%d].icon %q is not in the SVG catalog", i, cfg.Links[i].Icon)
 		}
 		if cfg.Links[i].Rel == "" {
 			cfg.Links[i].Rel = "me noopener noreferrer"

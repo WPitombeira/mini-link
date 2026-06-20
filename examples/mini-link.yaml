@@ -1,0 +1,28 @@
+name: WPitombeira
+title: WPitombeira links
+bio: Builder, AI systems, automation
+avatar: WP
+base_url: https://wpitombeira.com.br
+accent: "#0f766e"
+footer: Open source, MIT licensed, built with Go.
+cache_seconds: 300
+links:
+  - title: Mini-Link
+    url: https://github.com/WPitombeira/mini-link
+    icon: code
+    featured: true
+  - title: GitHub
+    url: https://github.com/WPitombeira
+    icon: github
+  - title: LinkedIn
+    url: https://www.linkedin.com/
+    icon: linkedin
+  - title: Website
+    url: https://wpitombeira.com.br
+    icon: globe
+  - title: Projects
+    url: https://github.com/WPitombeira?tab=repositories
+    icon: code
+  - title: Contact
+    url: mailto:hello@wpitombeira.com.br
+    icon: contact

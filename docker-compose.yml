@@ -1,0 +1,8 @@
+services:
+  mini-link:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./examples/mini-link.yaml:/mini-link.yaml:ro
+    command: ["serve", "-addr", ":8080", "-config", "/mini-link.yaml"]

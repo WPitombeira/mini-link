@@ -11,12 +11,29 @@ open docs/icons.html
 
 Current icon keys:
 
+- `briefcase`
+- `calendar`
+- `check`
 - `code`
 - `contact`
+- `copy`
+- `external-link`
+- `file-text`
 - `github`
 - `globe`
+- `home`
+- `instagram`
 - `linkedin`
 - `link`
+- `mail`
+- `map-pin`
+- `moon`
+- `phone`
+- `rss`
+- `sun`
+- `terminal`
+- `user`
+- `whatsapp`
 - `x`
 
 Use an icon key in JSON, YAML, or env config:
@@ -28,4 +45,4 @@ links:
     icon: github
 ```
 
-Brand icons are sourced from Simple Icons under CC0 1.0. Brand names and logos may still be trademarks of their owners. Custom utility icons in this repository are MIT licensed.
+Generic icons are sourced from Heroicons under the MIT License where noted. Brand icons are sourced from Simple Icons under CC0 1.0. Brand names and logos may still be trademarks of their owners. Custom utility icons in this repository are MIT licensed. See [../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

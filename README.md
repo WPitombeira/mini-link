@@ -10,6 +10,8 @@ It uses only the Go standard library. The rendered page has inline CSS and inlin
 - JSON, small YAML subset, and env configuration
 - strong ETag, Last-Modified, and CDN-friendly Cache-Control headers
 - precompiled inline SVG icon catalog
+- selectable `classic`, `glass`, and `terminal` templates
+- SEO-ready canonical, social metadata, JSON-LD, robots, and sitemap output
 - Docker, Docker Compose, Cloudflare Pages, Cloudflare Workers/static assets, Vercel, and manual deployment docs
 - MIT license
 
@@ -43,6 +45,10 @@ Use the format that fits your deployment:
 - env file: `examples/mini-link.env.example`
 
 See [docs/configuration.md](docs/configuration.md).
+
+## Templates
+
+Set `template` to `classic`, `glass`, or `terminal`. See [docs/templates.md](docs/templates.md).
 
 ## SVG Icons
 

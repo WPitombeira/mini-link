@@ -93,6 +93,8 @@ func setConfigScalar(cfg *Config, key string, value string) error {
 		cfg.Avatar = unquote(value)
 	case "base_url":
 		cfg.BaseURL = unquote(value)
+	case "template":
+		cfg.Template = unquote(value)
 	case "accent":
 		cfg.Accent = unquote(value)
 	case "footer":

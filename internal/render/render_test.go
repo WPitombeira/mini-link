@@ -11,6 +11,7 @@ import (
 func TestPageRendersInlineSVGAndEscapesText(t *testing.T) {
 	cfg := config.Default()
 	cfg.Name = `<Mini>`
+	cfg.BaseURL = "https://example.com"
 	cfg.Links = []config.Link{{Title: "GitHub", URL: "https://github.com/WPitombeira/mini-link", Icon: "github"}}
 	page, err := Page(cfg)
 	if err != nil {
@@ -23,8 +24,14 @@ func TestPageRendersInlineSVGAndEscapesText(t *testing.T) {
 	if !strings.Contains(html, `<svg viewBox="0 0 24 24"`) {
 		t.Fatal("expected inline svg")
 	}
-	if strings.Contains(html, "<script") {
-		t.Fatal("page should not include scripts")
+	if !strings.Contains(html, `<link rel="canonical" href="https://example.com/">`) {
+		t.Fatal("missing canonical")
+	}
+	if !strings.Contains(html, `<meta property="og:title"`) || !strings.Contains(html, `<meta name="twitter:card"`) {
+		t.Fatal("missing social metadata")
+	}
+	if !strings.Contains(html, `<script type="application/ld+json">`) || !strings.Contains(html, `"@type":"Person"`) {
+		t.Fatal("missing person json-ld")
 	}
 }
 

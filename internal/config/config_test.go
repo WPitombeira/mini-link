@@ -20,6 +20,9 @@ func TestLoadYAML(t *testing.T) {
 	if !cfg.Links[0].Featured {
 		t.Fatal("first link should be featured")
 	}
+	if cfg.Template != "glass" {
+		t.Fatalf("template = %q", cfg.Template)
+	}
 }
 
 func TestLoadJSON(t *testing.T) {
@@ -72,5 +75,26 @@ func TestLoadRejectsUnknownIcon(t *testing.T) {
 	}
 	if _, err := Load(path); err == nil {
 		t.Fatal("expected unknown icon error")
+	}
+}
+
+func TestLoadRejectsLowContrastAccent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.json")
+	if err := os.WriteFile(path, []byte(`{
+  "name": "Low Contrast",
+  "accent": "#ffffff",
+  "links": [
+    {
+      "title": "Website",
+      "url": "https://example.com",
+      "icon": "globe"
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected low contrast accent error")
 	}
 }

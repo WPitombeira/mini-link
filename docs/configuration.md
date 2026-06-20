@@ -2,6 +2,19 @@
 
 Mini-Link can load the same profile from JSON, a small YAML subset, or environment variables.
 
+Common fields:
+
+- `name`
+- `title`
+- `bio`
+- `avatar`
+- `base_url`
+- `template`: `classic`, `glass`, or `terminal`
+- `accent`
+- `footer`
+- `cache_seconds`
+- `links`
+
 ## JSON
 
 ```bash

@@ -4,6 +4,7 @@
   "bio": "Builder, AI systems, automation",
   "avatar": "WP",
   "base_url": "https://wpitombeira.com.br",
+  "template": "glass",
   "accent": "#0f766e",
   "footer": "Open source, MIT licensed, built with Go.",
   "cache_seconds": 300,

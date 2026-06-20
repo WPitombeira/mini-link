@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"encoding/json"
 	"html/template"
 	"net/url"
 	"strings"
@@ -11,9 +12,13 @@ import (
 )
 
 type pageData struct {
-	Config config.Config
-	Links  []linkData
-	Year   int
+	Config      config.Config
+	Links       []linkData
+	Year        int
+	Canonical   string
+	Description string
+	Template    string
+	Schema      template.JS
 }
 
 type linkData struct {
@@ -33,8 +38,18 @@ func Page(cfg config.Config) ([]byte, error) {
 		links = append(links, linkData{Link: link, Icon: template.HTML(icon.SVG), Host: host(link.URL), New: opensNewTab(link.URL)})
 	}
 
+	data := pageData{
+		Config:      cfg,
+		Links:       links,
+		Year:        2026,
+		Canonical:   canonicalURL(cfg),
+		Description: description(cfg),
+		Template:    "theme-" + cfg.Template,
+		Schema:      template.JS(schemaJSON(cfg, links)),
+	}
+
 	var buf bytes.Buffer
-	err := pageTemplate.Execute(&buf, pageData{Config: cfg, Links: links, Year: 2026})
+	err := pageTemplate.Execute(&buf, data)
 	return buf.Bytes(), err
 }
 
@@ -50,34 +65,102 @@ func host(raw string) string {
 	return strings.TrimPrefix(parsed.Hostname(), "www.")
 }
 
+func canonicalURL(cfg config.Config) string {
+	if cfg.BaseURL == "" {
+		return ""
+	}
+	parsed, err := url.Parse(cfg.BaseURL)
+	if err != nil {
+		return ""
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	if parsed.Path == "" {
+		parsed.Path = "/"
+	}
+	return parsed.String()
+}
+
+func description(cfg config.Config) string {
+	if cfg.Bio != "" {
+		return cfg.Bio
+	}
+	return cfg.Title
+}
+
+func schemaJSON(cfg config.Config, links []linkData) string {
+	sameAs := make([]string, 0, len(links))
+	for _, link := range links {
+		if strings.HasPrefix(link.URL, "https://") || strings.HasPrefix(link.URL, "http://") {
+			sameAs = append(sameAs, link.URL)
+		}
+	}
+	payload := map[string]any{
+		"@context":    "https://schema.org",
+		"@type":       "Person",
+		"name":        cfg.Name,
+		"description": description(cfg),
+		"url":         canonicalURL(cfg),
+		"sameAs":      sameAs,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "{}"
+	}
+	return string(raw)
+}
+
 var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
-<meta name="description" content="{{.Config.Bio}}">
+<meta name="description" content="{{.Description}}">
+<meta name="robots" content="index,follow">
+{{if .Canonical}}<link rel="canonical" href="{{.Canonical}}">{{end}}
+<meta property="og:type" content="profile">
+<meta property="og:title" content="{{.Config.Title}}">
+<meta property="og:description" content="{{.Description}}">
+{{if .Canonical}}<meta property="og:url" content="{{.Canonical}}">{{end}}
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{.Config.Title}}">
+<meta name="twitter:description" content="{{.Description}}">
 <title>{{.Config.Title}}</title>
+<script type="application/ld+json">{{.Schema}}</script>
 <style>
-:root{--accent:{{.Config.Accent}};--bg:#fff;--text:#111827;--muted:#5b6472;--line:#d8dee8;--soft:#f8fafc;--shadow:0 12px 32px rgba(17,24,39,.08)}
+:root{--accent:{{.Config.Accent}};--bg:#fff;--text:#111827;--muted:#5b6472;--line:#d8dee8;--soft:#f8fafc;--shadow:0 16px 44px rgba(17,24,39,.10);--radius:18px}
 *{box-sizing:border-box}
 html{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);text-rendering:optimizeLegibility}
 body{margin:0;min-height:100vh;display:grid;place-items:center;padding:32px 18px;line-height:1.5}
-main{width:min(100%,520px);min-height:min(820px,calc(100vh - 64px));display:grid;grid-template-rows:auto 1fr auto;border:1px solid var(--line);border-radius:8px;padding:28px 28px 34px}
+body.theme-glass{--bg:#f5f7fb;--text:#0b1220;--muted:#475569;--line:rgba(148,163,184,.42);background:radial-gradient(circle at 50% -12%,rgba(255,255,255,.94),rgba(245,247,251,.88) 36%,#eef2f7 100%)}
+body.theme-terminal{--bg:#07110e;--text:#d8ffe8;--muted:#91c7a6;--line:#1f4f38;--soft:#0b1b15;--shadow:0 18px 52px rgba(0,0,0,.34);background:#07110e;color:var(--text)}
+main{width:min(100%,540px);min-height:min(820px,calc(100vh - 64px));display:grid;grid-template-rows:auto 1fr auto;border:1px solid var(--line);border-radius:var(--radius);padding:28px 28px 34px;background:#fff}
+.theme-glass main{border-color:rgba(255,255,255,.68);background:linear-gradient(145deg,rgba(255,255,255,.78),rgba(255,255,255,.46));box-shadow:var(--shadow);backdrop-filter:blur(18px) saturate(1.25)}
+.theme-terminal main{background:linear-gradient(180deg,#0a1712,#07110e);border-color:#23533d;border-radius:12px}
 .topbar{display:flex;align-items:center;justify-content:space-between;font-weight:760;font-size:15px;letter-spacing:0;color:#0b0f17}
+.theme-terminal .topbar{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#8ff0b2}
 .brand{display:inline-flex;align-items:center;gap:10px}
 .brand svg{width:24px;height:24px;fill:currentColor}
 .menu{font-size:24px;line-height:1;color:#0b0f17}
+.theme-terminal .menu{color:#8ff0b2}
 .profile{display:grid;align-content:center;gap:24px}
 .identity{text-align:center;display:grid;justify-items:center;gap:14px}
 .avatar{width:96px;height:96px;border:2px solid var(--text);border-radius:999px;display:grid;place-items:center;background:#fff;color:var(--text);font-weight:780;font-size:36px;letter-spacing:0}
+.theme-glass .avatar{border-color:rgba(255,255,255,.82);background:linear-gradient(145deg,rgba(255,255,255,.92),rgba(255,255,255,.58));box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 20px 44px rgba(15,23,42,.13)}
+.theme-terminal .avatar{border-color:#44d17c;background:#07110e;color:#8ff0b2;border-radius:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing:0}
+.theme-terminal h1{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#d8ffe8}
 .bio{margin:0;color:var(--muted);font-size:15px}
 .links{display:grid;gap:10px}
-.link{min-height:54px;display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:14px;padding:13px 15px;border:1px solid var(--text);border-radius:5px;color:var(--text);text-decoration:none;background:#fff;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.link{min-height:56px;display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:14px;padding:13px 15px;border:1px solid var(--text);border-radius:10px;color:var(--text);text-decoration:none;background:#fff;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
 .link:hover{border-color:var(--accent);box-shadow:0 10px 24px rgba(17,24,39,.08);transform:translateY(-1px)}
 .link:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 32%,transparent);outline-offset:3px}
 .link.featured{min-height:76px;border-color:var(--accent);color:#166534;background:#fbfffd}
+.theme-glass .link{border-color:rgba(255,255,255,.74);background:rgba(255,255,255,.62);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+.theme-glass .link.featured{background:linear-gradient(145deg,rgba(255,255,255,.82),color-mix(in srgb,var(--accent) 9%,rgba(255,255,255,.58)));color:#115e45}
+.theme-terminal .link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border-color:#24543d;background:#0b1b15;color:#d8ffe8;border-radius:8px}
+.theme-terminal .link.featured{background:#0f2a1f;color:#8ff0b2;border-color:#44d17c}
 .link:not(.featured) .label{text-align:center}
 .link:not(.featured) .host{display:none}
 .link:not(.featured) .arrow{visibility:hidden}
@@ -89,12 +172,13 @@ h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing
 .featured .host{color:#1f6f46}
 .arrow{font-size:26px;color:currentColor;line-height:1}
 footer{text-align:center;color:var(--muted);font-size:12px}
-footer a{color:var(--text);text-decoration-color:var(--line);text-underline-offset:3px}
-@media (max-width:600px){body{padding:0;place-items:start center}main{min-height:100vh;border:0;border-radius:0;padding:30px 18px}.profile{align-content:start;padding-top:52px}.avatar{width:86px;height:86px;font-size:32px}h1{font-size:30px}.bio{font-size:14px}.link{min-height:52px;padding:12px 13px}.link.featured{min-height:72px}}
+footer a{min-height:48px;display:inline-flex;align-items:center;color:var(--text);text-decoration-color:var(--line);text-underline-offset:3px}
+.theme-terminal footer a{color:#d8ffe8}
+@media (max-width:600px){body{padding:0;place-items:start center}main{min-height:100vh;border:0;border-radius:0;padding:30px 18px}.profile{align-content:start;padding-top:52px}.avatar{width:86px;height:86px;font-size:32px}h1{font-size:30px}.bio{font-size:14px}.link{min-height:54px;padding:12px 13px}.link.featured{min-height:72px}.theme-glass main{box-shadow:none}.theme-terminal main{border-radius:0}}
 @media (prefers-reduced-motion:reduce){.link{transition:none}.link:hover{transform:none}}
 </style>
 </head>
-<body>
+<body class="{{.Template}}">
 <main>
 <header class="topbar">
 <span class="brand"><span class="icon">{{with index .Links 0}}{{.Icon}}{{end}}</span> Mini-Link</span>
@@ -102,7 +186,7 @@ footer a{color:var(--text);text-decoration-color:var(--line);text-underline-offs
 </header>
 <section class="profile">
 <section class="identity" aria-label="Profile">
-<div class="avatar">{{.Config.Avatar}}</div>
+<div class="avatar" aria-hidden="true">{{.Config.Avatar}}</div>
 <div>
 <h1>{{.Config.Name}}</h1>
 <p class="bio">{{.Config.Bio}}</p>

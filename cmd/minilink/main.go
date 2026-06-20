@@ -84,6 +84,12 @@ func serve(args []string) error {
 		}
 		writeHTML(w, r, page, etag, started, cfg.CacheSeconds)
 	})
+	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		writeText(w, []byte(robotsTXT(cfg)), "text/plain; charset=utf-8", cfg.CacheSeconds)
+	})
+	mux.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
+		writeText(w, []byte(sitemapXML(cfg, started)), "application/xml; charset=utf-8", cfg.CacheSeconds)
+	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusOK)
@@ -128,6 +134,12 @@ func export(args []string) error {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(*out, "vercel.json"), []byte(vercelConfig(cfg.CacheSeconds)), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(*out, "robots.txt"), []byte(robotsTXT(cfg)), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(*out, "sitemap.xml"), []byte(sitemapXML(cfg, time.Now().UTC())), 0o644); err != nil {
 		return err
 	}
 	fmt.Printf("exported %s\n", filepath.Clean(*out))
@@ -175,6 +187,7 @@ func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string,
 	w.Header().Set("Cache-Control", cacheControl(ttl))
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
+	securityHeaders(w.Header())
 	if match := r.Header.Get("If-None-Match"); match == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -191,6 +204,14 @@ func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string,
 	_, _ = w.Write(page)
 }
 
+func writeText(w http.ResponseWriter, body []byte, contentType string, ttl int) {
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", cacheControl(ttl))
+	securityHeaders(w.Header())
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+}
+
 func strongETag(body []byte) string {
 	sum := sha256.Sum256(body)
 	return `"` + hex.EncodeToString(sum[:]) + `"`
@@ -204,7 +225,12 @@ func cacheControl(ttl int) string {
 }
 
 func headersFile(ttl int) string {
-	return "/*\n  Cache-Control: " + cacheControl(ttl) + "\n  X-Content-Type-Options: nosniff\n"
+	return "/*\n" +
+		"  Cache-Control: " + cacheControl(ttl) + "\n" +
+		"  Content-Security-Policy: " + contentSecurityPolicy() + "\n" +
+		"  X-Content-Type-Options: nosniff\n" +
+		"  Referrer-Policy: strict-origin-when-cross-origin\n" +
+		"  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()\n"
 }
 
 func vercelConfig(ttl int) string {
@@ -214,12 +240,56 @@ func vercelConfig(ttl int) string {
       "source": "/(.*)",
       "headers": [
         { "key": "Cache-Control", "value": %q },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        { "key": "Content-Security-Policy", "value": %q },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=(), payment=()" }
       ]
     }
   ]
 }
-`, cacheControl(ttl))
+`, cacheControl(ttl), contentSecurityPolicy())
+}
+
+func securityHeaders(header http.Header) {
+	header.Set("Content-Security-Policy", contentSecurityPolicy())
+	header.Set("X-Content-Type-Options", "nosniff")
+	header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+	header.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()")
+}
+
+func contentSecurityPolicy() string {
+	return "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+}
+
+func robotsTXT(cfg config.Config) string {
+	base := strings.TrimRight(cfg.BaseURL, "/")
+	if base == "" {
+		return "User-agent: *\nAllow: /\n"
+	}
+	return "User-agent: *\nAllow: /\nSitemap: " + base + "/sitemap.xml\n"
+}
+
+func sitemapXML(cfg config.Config, modified time.Time) string {
+	loc := strings.TrimRight(cfg.BaseURL, "/")
+	if loc == "" {
+		loc = "/"
+	}
+	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>%s</loc>
+    <lastmod>%s</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
+`, xmlEscape(loc), modified.Format("2006-01-02"))
+}
+
+func xmlEscape(value string) string {
+	replacer := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;", "'", "&apos;")
+	return replacer.Replace(value)
 }
 
 func envDefault(key string, fallback string) string {

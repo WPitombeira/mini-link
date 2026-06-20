@@ -16,6 +16,14 @@ Export static files:
 ./bin/minilink export -config examples/mini-link.yaml -out dist
 ```
 
+Static export writes:
+
+- `index.html`
+- `robots.txt`
+- `sitemap.xml`
+- `_headers` for Cloudflare Pages and compatible hosts
+- `vercel.json` for Vercel header configuration
+
 ## Docker
 
 ```bash
@@ -44,7 +52,7 @@ In Cloudflare Pages:
 - build command: `go run ./cmd/minilink export -config examples/mini-link.yaml -out dist`
 - output directory: `dist`
 
-The export writes `dist/_headers` with cache headers Cloudflare Pages understands.
+The export writes `dist/_headers` with cache, content type, and security headers Cloudflare Pages understands.
 
 ## Cloudflare Workers
 
@@ -83,7 +91,7 @@ Set:
 - build command: `go run ./cmd/minilink export -config examples/mini-link.yaml -out dist`
 - output directory: `dist`
 
-The export writes `dist/vercel.json` with cache headers.
+The export writes `dist/vercel.json` with cache, content type, and security headers.
 
 ## Caching
 
@@ -94,3 +102,9 @@ Server mode sends:
 - `Cache-Control: public, max-age=300, s-maxage=86400, stale-while-revalidate=604800` by default
 
 Static export writes equivalent platform headers. Increase `cache_seconds` when config changes are infrequent.
+
+## SEO and Security Headers
+
+Mini-Link emits canonical, Open Graph, Twitter Card, and JSON-LD metadata on the page. Server mode and static export also provide `robots.txt` and `sitemap.xml` when `base_url` is configured.
+
+The default security headers are intentionally strict because Mini-Link does not need client JavaScript, frames, forms, camera, microphone, geolocation, or payment APIs.

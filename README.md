@@ -11,6 +11,7 @@ It uses only the Go standard library. The rendered page has inline CSS and inlin
 - strong ETag, Last-Modified, and CDN-friendly Cache-Control headers
 - precompiled inline SVG icon catalog
 - selectable `classic`, `glass`, and `terminal` templates
+- native dropdown groups without JavaScript
 - SEO-ready canonical, social metadata, JSON-LD, robots, and sitemap output
 - Docker, Docker Compose, Cloudflare Pages, Cloudflare Workers/static assets, Vercel, and manual deployment docs
 - MIT license
@@ -46,6 +47,14 @@ Use the format that fits your deployment:
 
 See [docs/configuration.md](docs/configuration.md).
 
+Extra examples:
+
+- `examples/minimal.yaml`
+- `examples/dropdowns.yaml`
+- `examples/dropdowns.json`
+- `examples/cloudflare/wrangler.toml`
+- `examples/cloudflare/pages.toml`
+
 ## Templates
 
 Set `template` to `classic`, `glass`, or `terminal`. See [docs/templates.md](docs/templates.md).
@@ -62,7 +71,7 @@ Then open `docs/icons.html`. See [docs/icons.md](docs/icons.md).
 
 ## Deployment
 
-See [docs/deployment.md](docs/deployment.md) for Docker, Docker Compose, manual Go builds, Cloudflare Pages, Cloudflare Workers/static assets, and Vercel.
+See [docs/deployment.md](docs/deployment.md) for Docker, Docker Compose, manual Go builds, Cloudflare Pages, Cloudflare Workers/static assets, and Vercel. See [docs/cloudflare.md](docs/cloudflare.md) for a Cloudflare-specific tutorial.
 
 ## License
 

@@ -9,6 +9,9 @@ go test ./...
 go run ./cmd/minilink validate -config examples/mini-link.yaml
 go run ./cmd/minilink validate -config examples/mini-link.json
 go run ./cmd/minilink validate -config examples/mini-link.env.example
+go run ./cmd/minilink validate -config examples/dropdowns.yaml
+go run ./cmd/minilink validate -config examples/dropdowns.json
+go run ./cmd/minilink validate -config examples/minimal.yaml
 go run ./cmd/minilink icons -out docs/icons.html
 go run ./cmd/minilink export -config examples/mini-link.yaml -out dist
 ```
@@ -23,6 +26,7 @@ Then check:
 
 - `/` renders the profile and all links.
 - a featured link has distinct styling.
+- dropdown groups open and close with mouse and keyboard.
 - SVG icons render inline.
 - link clicks navigate to the expected targets.
 - refreshing with `If-None-Match` returns `304`.

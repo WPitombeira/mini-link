@@ -14,11 +14,14 @@ func TestLoadYAML(t *testing.T) {
 	if cfg.Name != "WPitombeira" {
 		t.Fatalf("name = %q", cfg.Name)
 	}
-	if len(cfg.Links) != 6 {
-		t.Fatalf("links = %d", len(cfg.Links))
+	if CountLinks(cfg.Links) != 7 {
+		t.Fatalf("links = %d", CountLinks(cfg.Links))
 	}
 	if !cfg.Links[0].Featured {
 		t.Fatal("first link should be featured")
+	}
+	if len(cfg.Links[4].Links) != 2 {
+		t.Fatalf("dropdown links = %d", len(cfg.Links[4].Links))
 	}
 	if cfg.Template != "glass" {
 		t.Fatalf("template = %q", cfg.Template)
@@ -32,6 +35,9 @@ func TestLoadJSON(t *testing.T) {
 	}
 	if cfg.Accent != "#0f766e" {
 		t.Fatalf("accent = %q", cfg.Accent)
+	}
+	if CountLinks(cfg.Links) != 7 {
+		t.Fatalf("links = %d", CountLinks(cfg.Links))
 	}
 }
 
@@ -55,6 +61,47 @@ MINI_LINK_LINK_1_ICON=globe
 	}
 	if cfg.Links[0].Icon != "globe" {
 		t.Fatalf("icon = %q", cfg.Links[0].Icon)
+	}
+}
+
+func TestLoadDropdownExamples(t *testing.T) {
+	for _, name := range []string{"dropdowns.yaml", "dropdowns.json"} {
+		cfg, err := Load(filepath.Join("..", "..", "examples", name))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if CountLinks(cfg.Links) != 8 {
+			t.Fatalf("%s links = %d", name, CountLinks(cfg.Links))
+		}
+		if !cfg.Links[1].Open {
+			t.Fatalf("%s work dropdown should be open", name)
+		}
+	}
+}
+
+func TestLoadRejectsURLAndNestedLinks(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.json")
+	if err := os.WriteFile(path, []byte(`{
+  "name": "Bad Dropdown",
+  "links": [
+    {
+      "title": "Bad",
+      "url": "https://example.com",
+      "links": [
+        {
+          "title": "Website",
+          "url": "https://example.com",
+          "icon": "globe"
+        }
+      ]
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected url plus nested links error")
 	}
 }
 

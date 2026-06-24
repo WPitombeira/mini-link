@@ -10,7 +10,7 @@ import (
 func parseYAML(raw string) (Config, error) {
 	var cfg Config
 	var links []Link
-	var current *Link
+	var stack []linkFrame
 	inLinks := false
 
 	scanner := bufio.NewScanner(strings.NewReader(raw))
@@ -46,8 +46,15 @@ func parseYAML(raw string) (Config, error) {
 			return Config{}, fmt.Errorf("line %d: nested values are only supported under links", lineNo)
 		}
 		if strings.HasPrefix(trimmed, "- ") {
-			links = append(links, Link{})
-			current = &links[len(links)-1]
+			parent := currentParent(stack, indent)
+			if parent == nil {
+				links = append(links, Link{})
+				stack = pushLinkFrame(stack, indent, &links[len(links)-1])
+			} else {
+				parent.Links = append(parent.Links, Link{})
+				stack = pushLinkFrame(stack, indent, &parent.Links[len(parent.Links)-1])
+			}
+			current := stack[len(stack)-1].link
 			rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
 			if rest == "" {
 				continue
@@ -61,6 +68,7 @@ func parseYAML(raw string) (Config, error) {
 			}
 			continue
 		}
+		current := currentParent(stack, indent)
 		if current == nil {
 			return Config{}, fmt.Errorf("line %d: link item must start with -", lineNo)
 		}
@@ -68,7 +76,12 @@ func parseYAML(raw string) (Config, error) {
 		if !ok {
 			return Config{}, fmt.Errorf("line %d: expected key: value", lineNo)
 		}
-		if err := setLinkScalar(current, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "links" && value == "" {
+			continue
+		}
+		if err := setLinkScalar(current, key, value); err != nil {
 			return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
 		}
 	}
@@ -79,6 +92,27 @@ func parseYAML(raw string) (Config, error) {
 		cfg.Links = links
 	}
 	return cfg, nil
+}
+
+type linkFrame struct {
+	indent int
+	link   *Link
+}
+
+func currentParent(stack []linkFrame, indent int) *Link {
+	for i := len(stack) - 1; i >= 0; i-- {
+		if stack[i].indent < indent {
+			return stack[i].link
+		}
+	}
+	return nil
+}
+
+func pushLinkFrame(stack []linkFrame, indent int, link *Link) []linkFrame {
+	for len(stack) > 0 && stack[len(stack)-1].indent >= indent {
+		stack = stack[:len(stack)-1]
+	}
+	return append(stack, linkFrame{indent: indent, link: link})
 }
 
 func setConfigScalar(cfg *Config, key string, value string) error {
@@ -127,6 +161,12 @@ func setLinkScalar(link *Link, key string, value string) error {
 			return err
 		}
 		link.Featured = parsed
+	case "open":
+		parsed, err := strconv.ParseBool(unquote(value))
+		if err != nil {
+			return err
+		}
+		link.Open = parsed
 	default:
 		return fmt.Errorf("unknown link key %q", key)
 	}

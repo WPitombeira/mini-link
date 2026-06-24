@@ -33,10 +33,11 @@ Mini-Link does not depend on a YAML package, so YAML support intentionally cover
 
 - top-level scalar keys
 - `links:` as a list of maps
+- nested `links:` under a link item for dropdown groups
 - strings, booleans, and integer `cache_seconds`
 - comments with `#` outside quoted strings
 
-Advanced YAML features such as anchors, multi-line strings, nested objects outside `links`, and custom tags are not supported.
+Advanced YAML features such as anchors, multi-line strings, nested objects outside link groups, and custom tags are not supported.
 
 ## Env
 
@@ -65,3 +66,30 @@ MINI_LINK_LINK_1_REL
 ```
 
 For larger env-only deployments, use `MINI_LINK_LINKS_JSON` with a JSON array of links.
+
+## Dropdowns
+
+A link can either point directly to a `url`, or it can be a dropdown group with nested `links`. Dropdowns render with native HTML `<details>` and `<summary>`, so they work without JavaScript.
+
+```yaml
+links:
+  - title: Projects
+    icon: briefcase
+    open: true
+    links:
+      - title: Mini-Link
+        url: https://github.com/WPitombeira/mini-link
+        icon: github
+      - title: Portfolio
+        url: https://example.com
+        icon: globe
+```
+
+Dropdown rules:
+
+- dropdown groups use `title`, optional `icon`, optional `featured`, optional `open`, and nested `links`
+- direct links use `title`, `url`, optional `icon`, optional `featured`, and optional `rel`
+- a single item cannot define both `url` and nested `links`
+- nesting is limited to three levels to keep the page readable
+
+Env files can use `MINI_LINK_LINKS_JSON` for dropdowns because numbered env variables are intentionally flat.

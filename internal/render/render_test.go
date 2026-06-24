@@ -35,6 +35,39 @@ func TestPageRendersInlineSVGAndEscapesText(t *testing.T) {
 	}
 }
 
+func TestPageRendersDropdowns(t *testing.T) {
+	cfg := config.Default()
+	cfg.BaseURL = "https://example.com"
+	cfg.Links = []config.Link{
+		{
+			Title: "Projects",
+			Icon:  "briefcase",
+			Open:  true,
+			Links: []config.Link{
+				{Title: "Mini-Link", URL: "https://github.com/WPitombeira/mini-link", Icon: "github"},
+				{Title: "Contact", URL: "mailto:hello@example.com", Icon: "mail"},
+			},
+		},
+	}
+	page, err := Page(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(page)
+	if !strings.Contains(html, `<details class="dropdown" open>`) {
+		t.Fatal("missing open dropdown")
+	}
+	if !strings.Contains(html, `<summary>`) {
+		t.Fatal("missing summary")
+	}
+	if !strings.Contains(html, `href="https://github.com/WPitombeira/mini-link"`) {
+		t.Fatal("missing child link")
+	}
+	if !strings.Contains(html, `"sameAs":["https://github.com/WPitombeira/mini-link"]`) {
+		t.Fatal("external child link should be included in schema")
+	}
+}
+
 func TestIconCatalogIncludesKeys(t *testing.T) {
 	html, err := IconCatalog(icons.All())
 	if err != nil {

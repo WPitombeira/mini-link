@@ -23,20 +23,14 @@ type pageData struct {
 
 type linkData struct {
 	config.Link
-	Icon template.HTML
-	Host string
-	New  bool
+	Icon     template.HTML
+	Host     string
+	New      bool
+	Children []linkData
 }
 
 func Page(cfg config.Config) ([]byte, error) {
-	links := make([]linkData, 0, len(cfg.Links))
-	for _, link := range cfg.Links {
-		icon, ok := icons.Get(link.Icon)
-		if !ok {
-			icon, _ = icons.Get("link")
-		}
-		links = append(links, linkData{Link: link, Icon: template.HTML(icon.SVG), Host: host(link.URL), New: opensNewTab(link.URL)})
-	}
+	links := buildLinks(cfg.Links)
 
 	data := pageData{
 		Config:      cfg,
@@ -51,6 +45,24 @@ func Page(cfg config.Config) ([]byte, error) {
 	var buf bytes.Buffer
 	err := pageTemplate.Execute(&buf, data)
 	return buf.Bytes(), err
+}
+
+func buildLinks(links []config.Link) []linkData {
+	out := make([]linkData, 0, len(links))
+	for _, link := range links {
+		icon, ok := icons.Get(link.Icon)
+		if !ok {
+			icon, _ = icons.Get("link")
+		}
+		out = append(out, linkData{
+			Link:     link,
+			Icon:     template.HTML(icon.SVG),
+			Host:     host(link.URL),
+			New:      opensNewTab(link.URL),
+			Children: buildLinks(link.Links),
+		})
+	}
+	return out
 }
 
 func opensNewTab(raw string) bool {
@@ -89,12 +101,7 @@ func description(cfg config.Config) string {
 }
 
 func schemaJSON(cfg config.Config, links []linkData) string {
-	sameAs := make([]string, 0, len(links))
-	for _, link := range links {
-		if strings.HasPrefix(link.URL, "https://") || strings.HasPrefix(link.URL, "http://") {
-			sameAs = append(sameAs, link.URL)
-		}
-	}
+	sameAs := externalURLs(links)
 	payload := map[string]any{
 		"@context":    "https://schema.org",
 		"@type":       "Person",
@@ -110,7 +117,35 @@ func schemaJSON(cfg config.Config, links []linkData) string {
 	return string(raw)
 }
 
-var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
+func externalURLs(links []linkData) []string {
+	var urls []string
+	for _, link := range links {
+		if len(link.Children) > 0 {
+			urls = append(urls, externalURLs(link.Children)...)
+			continue
+		}
+		if strings.HasPrefix(link.URL, "https://") || strings.HasPrefix(link.URL, "http://") {
+			urls = append(urls, link.URL)
+		}
+	}
+	return urls
+}
+
+var pageTemplate = template.Must(template.New("page").Parse(`{{define "linkItem"}}{{if .Children}}<details class="dropdown{{if .Featured}} featured{{end}}"{{if .Open}} open{{end}}>
+<summary>
+<span class="icon">{{.Icon}}</span>
+<span class="label"><span class="title">{{.Title}}</span><span class="host">{{len .Children}} links</span></span>
+<span class="chevron" aria-hidden="true">⌄</span>
+</summary>
+<div class="dropdown-links">
+{{range .Children}}{{template "linkItem" .}}{{end}}</div>
+</details>
+{{else}}<a class="link{{if .Featured}} featured{{end}}" href="{{.URL}}" rel="{{.Rel}}"{{if .New}} target="_blank"{{end}}>
+<span class="icon">{{.Icon}}</span>
+<span class="label"><span class="title">{{.Title}}</span><span class="host">{{.Host}}</span></span>
+<span class="arrow" aria-hidden="true">›</span>
+</a>
+{{end}}{{end}}<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -153,17 +188,23 @@ h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing
 .theme-terminal h1{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#d8ffe8}
 .bio{margin:0;color:var(--muted);font-size:15px}
 .links{display:grid;gap:10px}
-.link{min-height:56px;display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:14px;padding:13px 15px;border:1px solid var(--text);border-radius:10px;color:var(--text);text-decoration:none;background:#fff;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
-.link:hover{border-color:var(--accent);box-shadow:0 10px 24px rgba(17,24,39,.08);transform:translateY(-1px)}
-.link:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 32%,transparent);outline-offset:3px}
+.link,.dropdown summary{min-height:56px;display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:14px;padding:13px 15px;border:1px solid var(--text);border-radius:10px;color:var(--text);text-decoration:none;background:#fff;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.dropdown summary{cursor:pointer;list-style:none}
+.dropdown summary::-webkit-details-marker{display:none}
+.link:hover,.dropdown summary:hover{border-color:var(--accent);box-shadow:0 10px 24px rgba(17,24,39,.08);transform:translateY(-1px)}
+.link:focus-visible,.dropdown summary:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 32%,transparent);outline-offset:3px}
 .link.featured{min-height:76px;border-color:var(--accent);color:#166534;background:#fbfffd}
-.theme-glass .link{border-color:rgba(255,255,255,.74);background:rgba(255,255,255,.62);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
+.dropdown.featured summary{min-height:76px;border-color:var(--accent);color:#166534;background:#fbfffd}
+.theme-glass .link,.theme-glass .dropdown summary{border-color:rgba(255,255,255,.74);background:rgba(255,255,255,.62);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
 .theme-glass .link.featured{background:linear-gradient(145deg,rgba(255,255,255,.82),color-mix(in srgb,var(--accent) 9%,rgba(255,255,255,.58)));color:#115e45}
-.theme-terminal .link{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border-color:#24543d;background:#0b1b15;color:#d8ffe8;border-radius:8px}
+.theme-glass .dropdown.featured summary{background:linear-gradient(145deg,rgba(255,255,255,.82),color-mix(in srgb,var(--accent) 9%,rgba(255,255,255,.58)));color:#115e45}
+.theme-terminal .link,.theme-terminal .dropdown summary{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border-color:#24543d;background:#0b1b15;color:#d8ffe8;border-radius:8px}
 .theme-terminal .link.featured{background:#0f2a1f;color:#8ff0b2;border-color:#44d17c}
-.link:not(.featured) .label{text-align:center}
+.theme-terminal .dropdown.featured summary{background:#0f2a1f;color:#8ff0b2;border-color:#44d17c}
+.link:not(.featured) .label,.dropdown:not(.featured) summary .label{text-align:center}
 .link:not(.featured) .host{display:none}
 .link:not(.featured) .arrow{visibility:hidden}
+.dropdown:not(.featured) summary .host{display:none}
 .icon{width:22px;height:22px;color:currentColor;display:grid;place-items:center}
 .icon svg{width:22px;height:22px;display:block;fill:currentColor}
 .label{display:grid;gap:1px;min-width:0}
@@ -171,11 +212,16 @@ h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing
 .host{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .featured .host{color:#1f6f46}
 .arrow{font-size:26px;color:currentColor;line-height:1}
+.chevron{font-size:20px;color:currentColor;line-height:1;text-align:center;transition:transform .16s ease}
+.dropdown[open] .chevron{transform:rotate(180deg)}
+.dropdown-links{display:grid;gap:8px;margin:8px 0 0 18px;padding-left:12px;border-left:1px solid var(--line)}
+.dropdown-links .link{min-height:52px}
+.theme-terminal .dropdown-links{border-left-color:#24543d}
 footer{text-align:center;color:var(--muted);font-size:12px}
 footer a{min-height:48px;display:inline-flex;align-items:center;color:var(--text);text-decoration-color:var(--line);text-underline-offset:3px}
 .theme-terminal footer a{color:#d8ffe8}
-@media (max-width:600px){body{padding:0;place-items:start center}main{min-height:100vh;border:0;border-radius:0;padding:30px 18px}.profile{align-content:start;padding-top:52px}.avatar{width:86px;height:86px;font-size:32px}h1{font-size:30px}.bio{font-size:14px}.link{min-height:54px;padding:12px 13px}.link.featured{min-height:72px}.theme-glass main{box-shadow:none}.theme-terminal main{border-radius:0}}
-@media (prefers-reduced-motion:reduce){.link{transition:none}.link:hover{transform:none}}
+@media (max-width:600px){body{padding:0;place-items:start center}main{min-height:100vh;border:0;border-radius:0;padding:30px 18px}.profile{align-content:start;padding-top:52px}.avatar{width:86px;height:86px;font-size:32px}h1{font-size:30px}.bio{font-size:14px}.link,.dropdown summary{min-height:54px;padding:12px 13px}.link.featured,.dropdown.featured summary{min-height:72px}.dropdown-links{margin-left:10px;padding-left:10px}.theme-glass main{box-shadow:none}.theme-terminal main{border-radius:0}}
+@media (prefers-reduced-motion:reduce){.link,.dropdown summary,.chevron{transition:none}.link:hover,.dropdown summary:hover{transform:none}}
 </style>
 </head>
 <body class="{{.Template}}">
@@ -193,12 +239,7 @@ footer a{min-height:48px;display:inline-flex;align-items:center;color:var(--text
 </div>
 </section>
 <nav class="links" aria-label="Links">
-{{range .Links}}<a class="link{{if .Featured}} featured{{end}}" href="{{.URL}}" rel="{{.Rel}}"{{if .New}} target="_blank"{{end}}>
-<span class="icon">{{.Icon}}</span>
-<span class="label"><span class="title">{{.Title}}</span><span class="host">{{.Host}}</span></span>
-<span class="arrow" aria-hidden="true">›</span>
-</a>
-{{end}}</nav>
+{{range .Links}}{{template "linkItem" .}}{{end}}</nav>
 </section>
 <footer>{{.Config.Footer}} <a href="https://github.com/WPitombeira/mini-link">Mini-Link</a></footer>
 </main>

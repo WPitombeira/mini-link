@@ -52,11 +52,11 @@ In Cloudflare Pages:
 - build command: `go run ./cmd/minilink export -config examples/mini-link.yaml -out dist`
 - output directory: `dist`
 
-The export writes `dist/_headers` with cache, content type, and security headers Cloudflare Pages understands.
+The export writes `dist/_headers` with cache, content type, and security headers Cloudflare Pages understands. See [cloudflare.md](cloudflare.md) for the full tutorial.
 
 ## Cloudflare Workers
 
-Workers do not run Go binaries directly. Deploy Mini-Link as prebuilt static assets with a Worker asset binding or Pages.
+Workers do not run Go binaries directly. Deploy Mini-Link as prebuilt static assets with Workers Static Assets or Pages.
 
 With Wrangler static assets:
 
@@ -68,8 +68,10 @@ Create `wrangler.toml`:
 
 ```toml
 name = "mini-link"
-compatibility_date = "2026-06-20"
-assets = { directory = "./dist" }
+compatibility_date = "2026-06-24"
+
+[assets]
+directory = "./dist"
 ```
 
 Then deploy:
@@ -77,6 +79,8 @@ Then deploy:
 ```bash
 npx wrangler deploy
 ```
+
+See [cloudflare.md](cloudflare.md) for the full tutorial, including custom domains and post-deploy checks.
 
 ## Vercel
 

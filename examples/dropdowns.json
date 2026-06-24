@@ -1,0 +1,67 @@
+{
+  "name": "Mini-Link Demo",
+  "title": "Mini-Link dropdown demo",
+  "bio": "Group related links without JavaScript.",
+  "avatar": "ML",
+  "base_url": "https://links.example.com",
+  "template": "terminal",
+  "accent": "#2f9e44",
+  "footer": "Dropdowns use native HTML details.",
+  "cache_seconds": 600,
+  "links": [
+    {
+      "title": "Featured project",
+      "url": "https://github.com/WPitombeira/mini-link",
+      "icon": "github",
+      "featured": true
+    },
+    {
+      "title": "Work",
+      "icon": "briefcase",
+      "open": true,
+      "links": [
+        {
+          "title": "Portfolio",
+          "url": "https://example.com",
+          "icon": "globe"
+        },
+        {
+          "title": "Resume",
+          "url": "https://example.com/resume",
+          "icon": "file-text"
+        },
+        {
+          "title": "Book a call",
+          "url": "https://example.com/calendar",
+          "icon": "calendar"
+        }
+      ]
+    },
+    {
+      "title": "Social",
+      "icon": "user",
+      "links": [
+        {
+          "title": "GitHub",
+          "url": "https://github.com/WPitombeira",
+          "icon": "github"
+        },
+        {
+          "title": "LinkedIn",
+          "url": "https://www.linkedin.com/",
+          "icon": "linkedin"
+        },
+        {
+          "title": "Instagram",
+          "url": "https://www.instagram.com/",
+          "icon": "instagram"
+        }
+      ]
+    },
+    {
+      "title": "Email",
+      "url": "mailto:hello@example.com",
+      "icon": "mail"
+    }
+  ]
+}

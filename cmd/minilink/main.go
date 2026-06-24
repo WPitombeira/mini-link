@@ -179,7 +179,7 @@ func validate(args []string) error {
 	if _, err := render.Page(cfg); err != nil {
 		return err
 	}
-	fmt.Printf("ok: %s with %d links\n", cfg.Name, len(cfg.Links))
+	fmt.Printf("ok: %s with %d links\n", cfg.Name, config.CountLinks(cfg.Links))
 	return nil
 }
 

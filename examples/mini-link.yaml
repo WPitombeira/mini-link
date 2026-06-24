@@ -22,8 +22,15 @@ links:
     url: https://wpitombeira.com.br
     icon: globe
   - title: Projects
-    url: https://github.com/WPitombeira?tab=repositories
-    icon: code
+    icon: briefcase
+    open: true
+    links:
+      - title: Mini-Link source
+        url: https://github.com/WPitombeira/mini-link
+        icon: github
+      - title: GitHub repositories
+        url: https://github.com/WPitombeira?tab=repositories
+        icon: code
   - title: Contact
     url: mailto:hello@wpitombeira.com.br
     icon: contact

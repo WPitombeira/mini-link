@@ -34,7 +34,9 @@ type Link struct {
 	URL      string `json:"url"`
 	Icon     string `json:"icon"`
 	Featured bool   `json:"featured"`
+	Open     bool   `json:"open"`
 	Rel      string `json:"rel"`
+	Links    []Link `json:"links,omitempty"`
 }
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
@@ -136,35 +138,62 @@ func normalize(cfg Config) (Config, error) {
 		cfg.CacheSeconds = 300
 	}
 	for i := range cfg.Links {
-		cfg.Links[i].Title = strings.TrimSpace(cfg.Links[i].Title)
-		cfg.Links[i].URL = strings.TrimSpace(cfg.Links[i].URL)
-		cfg.Links[i].Icon = strings.TrimSpace(strings.ToLower(cfg.Links[i].Icon))
-		cfg.Links[i].Rel = strings.TrimSpace(cfg.Links[i].Rel)
-		if cfg.Links[i].Title == "" {
-			return Config{}, fmt.Errorf("links[%d].title is required", i)
-		}
-		if cfg.Links[i].URL == "" {
-			return Config{}, fmt.Errorf("links[%d].url is required", i)
-		}
-		if err := validateURL(cfg.Links[i].URL); err != nil {
-			return Config{}, fmt.Errorf("links[%d].url: %w", i, err)
-		}
-		if cfg.Links[i].Icon == "" {
-			cfg.Links[i].Icon = "link"
-		}
-		if _, ok := icons.Get(cfg.Links[i].Icon); !ok {
-			return Config{}, fmt.Errorf("links[%d].icon %q is not in the SVG catalog", i, cfg.Links[i].Icon)
-		}
-		if cfg.Links[i].Rel == "" {
-			cfg.Links[i].Rel = "me noopener noreferrer"
-		} else if strings.HasPrefix(cfg.Links[i].URL, "http://") || strings.HasPrefix(cfg.Links[i].URL, "https://") {
-			cfg.Links[i].Rel = ensureRelTokens(cfg.Links[i].Rel, "noopener", "noreferrer")
+		if err := normalizeLink(&cfg.Links[i], fmt.Sprintf("links[%d]", i), 1); err != nil {
+			return Config{}, err
 		}
 	}
 	if len(cfg.Links) == 0 {
 		return Config{}, errors.New("at least one link is required")
 	}
 	return cfg, nil
+}
+
+func normalizeLink(link *Link, path string, depth int) error {
+	if depth > 3 {
+		return fmt.Errorf("%s exceeds maximum dropdown depth of 3", path)
+	}
+	link.Title = strings.TrimSpace(link.Title)
+	link.URL = strings.TrimSpace(link.URL)
+	link.Icon = strings.TrimSpace(strings.ToLower(link.Icon))
+	link.Rel = strings.TrimSpace(link.Rel)
+	if link.Title == "" {
+		return fmt.Errorf("%s.title is required", path)
+	}
+	if len(link.Links) > 0 {
+		if link.URL != "" {
+			return fmt.Errorf("%s cannot define both url and nested links", path)
+		}
+		if link.Icon == "" {
+			link.Icon = "link"
+		}
+		if _, ok := icons.Get(link.Icon); !ok {
+			return fmt.Errorf("%s.icon %q is not in the SVG catalog", path, link.Icon)
+		}
+		for i := range link.Links {
+			if err := normalizeLink(&link.Links[i], fmt.Sprintf("%s.links[%d]", path, i), depth+1); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if link.URL == "" {
+		return fmt.Errorf("%s.url is required", path)
+	}
+	if err := validateURL(link.URL); err != nil {
+		return fmt.Errorf("%s.url: %w", path, err)
+	}
+	if link.Icon == "" {
+		link.Icon = "link"
+	}
+	if _, ok := icons.Get(link.Icon); !ok {
+		return fmt.Errorf("%s.icon %q is not in the SVG catalog", path, link.Icon)
+	}
+	if link.Rel == "" {
+		link.Rel = "me noopener noreferrer"
+	} else if strings.HasPrefix(link.URL, "http://") || strings.HasPrefix(link.URL, "https://") {
+		link.Rel = ensureRelTokens(link.Rel, "noopener", "noreferrer")
+	}
+	return nil
 }
 
 func ensureRelTokens(rel string, tokens ...string) string {
@@ -328,15 +357,29 @@ func numberedLinks(values map[string]string) []Link {
 			break
 		}
 		featured, _ := strconv.ParseBool(values[prefix+"FEATURED"])
+		open, _ := strconv.ParseBool(values[prefix+"OPEN"])
 		links = append(links, Link{
 			Title:    title,
 			URL:      url,
 			Icon:     values[prefix+"ICON"],
 			Rel:      values[prefix+"REL"],
 			Featured: featured,
+			Open:     open,
 		})
 	}
 	return links
+}
+
+func CountLinks(links []Link) int {
+	count := 0
+	for _, link := range links {
+		if len(link.Links) > 0 {
+			count += CountLinks(link.Links)
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 func parseDotEnv(raw string) ([]string, error) {

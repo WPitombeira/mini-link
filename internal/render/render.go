@@ -220,7 +220,7 @@ func collectExternalURLs(links []linkData, seen map[string]bool, urls *[]string)
 
 var pageTemplate = template.Must(template.New("page").Parse(`{{define "linkItem"}}{{if .Children}}<details class="dropdown{{if .Featured}} featured{{end}}"{{if .Open}} open{{end}}>
 <summary>
-<span class="icon">{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="lazy" decoding="async">{{else}}{{.Icon}}{{end}}</span>
+<span class="icon">{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="eager" decoding="async">{{else}}{{.Icon}}{{end}}</span>
 <span class="label"><span class="title">{{.Title}}</span><span class="host">{{len .Children}} links</span></span>
 <span class="chevron" aria-hidden="true">⌄</span>
 </summary>
@@ -228,7 +228,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`{{define "linkItem"
 {{range .Children}}{{template "linkItem" .}}{{end}}</div>
 </details>
 {{else}}<a class="link{{if .Featured}} featured{{end}}" href="{{.URL}}" rel="{{.Rel}}"{{if .New}} target="_blank"{{end}}{{if .Style}} style="{{.Style}}"{{end}}>
-<span class="icon">{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="lazy" decoding="async">{{else}}{{.Icon}}{{end}}</span>
+<span class="icon">{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="eager" decoding="async">{{else}}{{.Icon}}{{end}}</span>
 <span class="label"><span class="title">{{.Title}}</span><span class="host">{{.Host}}</span></span>
 <span class="arrow" aria-hidden="true">›</span>
 </a>
@@ -273,8 +273,8 @@ main{width:min(100%,540px);min-height:min(820px,calc(100vh - 64px));display:grid
 .theme-terminal .menu{color:#8ff0b2}
 .profile{display:grid;align-content:center;gap:24px}
 .identity{text-align:center;display:grid;justify-items:center;gap:22px}
-.avatar{width:96px;height:96px;border:2px solid var(--text);border-radius:999px;display:grid;place-items:center;background:#fff;color:var(--text);font-weight:780;font-size:36px;letter-spacing:0}
-.avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover;object-position:center 35%;display:block}
+.avatar{width:96px;height:120px;border:2px solid var(--text);border-radius:999px;display:grid;place-items:center;background:#fff;color:var(--text);font-weight:780;font-size:36px;letter-spacing:0;overflow:hidden}
+.avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover;object-position:center 38%;display:block}
 .theme-glass .avatar{border-color:rgba(255,255,255,.82);background:linear-gradient(145deg,rgba(255,255,255,.92),rgba(255,255,255,.58));box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 20px 44px rgba(15,23,42,.13)}
 .theme-terminal .avatar{border-color:#44d17c;background:#07110e;color:#8ff0b2;border-radius:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing:0}
@@ -314,14 +314,14 @@ h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing
 footer{text-align:center;color:var(--muted);font-size:12px}
 footer a{min-height:48px;display:inline-flex;align-items:center;color:var(--text);text-decoration-color:var(--line);text-underline-offset:3px}
 .theme-terminal footer a{color:#d8ffe8}
-@media (max-width:600px){body{padding:0;place-items:start center}main{min-height:100vh;border:0;border-radius:0;padding:30px 18px}.profile{align-content:start;padding-top:52px}.avatar{width:86px;height:86px;font-size:32px}h1{font-size:30px}.bio{font-size:14px}.link,.dropdown summary{min-height:54px;padding:12px 13px}.link.featured,.dropdown.featured summary{min-height:72px}.dropdown-links{margin-left:10px;padding-left:10px}.theme-glass main{box-shadow:none}.theme-terminal main{border-radius:0}}
+@media (max-width:600px){body{padding:0;place-items:start center}main{min-height:100vh;border:0;border-radius:0;padding:30px 18px}.profile{align-content:start;padding-top:46px}.avatar{width:84px;height:106px;font-size:32px}h1{font-size:30px}.bio{font-size:14px}.link,.dropdown summary{min-height:54px;padding:12px 13px}.link.featured,.dropdown.featured summary{min-height:72px}.dropdown-links{margin-left:10px;padding-left:10px}.theme-glass main{box-shadow:none}.theme-terminal main{border-radius:0}}
 @media (prefers-reduced-motion:reduce){.link,.dropdown summary,.chevron{transition:none}.link:hover,.dropdown summary:hover{transform:none}}
 </style>
 </head>
 <body class="{{.Template}}">
 <main>
 <header class="topbar">
-<span class="brand"><span class="icon">{{with index .Links 0}}{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="lazy" decoding="async">{{else}}{{.Icon}}{{end}}{{end}}</span> Mini-Link</span>
+<span class="brand"><span class="icon">{{with index .Links 0}}{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="eager" decoding="async">{{else}}{{.Icon}}{{end}}{{end}}</span> Mini-Link</span>
 <span class="menu" aria-hidden="true">≡</span>
 </header>
 <section class="profile">

@@ -112,10 +112,10 @@ func TestPageRendersCustomAndExternalIcons(t *testing.T) {
 	if !strings.Contains(html, `<path d="M12 2 15 9 22 12 15 15 12 22 9 15 2 12 9 9Z"`) {
 		t.Fatal("missing path-based custom icon")
 	}
-	if !strings.Contains(html, `<img src="https://cdn.example.com/icon.svg" alt="" loading="lazy" decoding="async">`) {
+	if !strings.Contains(html, `<img src="https://cdn.example.com/icon.svg" alt="" loading="eager" decoding="async">`) {
 		t.Fatal("missing custom external icon")
 	}
-	if !strings.Contains(html, `<img src="https://cdn.example.com/direct.svg" alt="" loading="lazy" decoding="async">`) {
+	if !strings.Contains(html, `<img src="https://cdn.example.com/direct.svg" alt="" loading="eager" decoding="async">`) {
 		t.Fatal("missing direct external icon")
 	}
 }

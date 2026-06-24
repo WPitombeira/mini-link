@@ -68,6 +68,16 @@ func TestContentSecurityPolicyTracking(t *testing.T) {
 	}
 }
 
+func TestHeadersFileCachesStaticAssetsLongTerm(t *testing.T) {
+	headers := headersFile(300, false, false)
+	if !strings.Contains(headers, "/assets/*\n  Cache-Control: public, max-age=31536000, immutable") {
+		t.Fatalf("missing immutable assets header: %s", headers)
+	}
+	if !strings.Contains(headers, "/apple-touch-icon.png\n  Cache-Control: public, max-age=31536000, immutable") {
+		t.Fatalf("missing immutable touch icon header: %s", headers)
+	}
+}
+
 func TestRobotsAndSitemap(t *testing.T) {
 	cfg := config.Default()
 	cfg.BaseURL = "https://example.com"

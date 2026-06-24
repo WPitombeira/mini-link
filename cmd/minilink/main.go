@@ -286,11 +286,30 @@ func cacheControl(ttl int) string {
 
 func headersFile(ttl int, allowExternalImages bool, allowTracking bool) string {
 	return "/*\n" +
-		"  Cache-Control: " + cacheControl(ttl) + "\n" +
 		"  Content-Security-Policy: " + contentSecurityPolicy(allowExternalImages, allowTracking) + "\n" +
 		"  X-Content-Type-Options: nosniff\n" +
 		"  Referrer-Policy: strict-origin-when-cross-origin\n" +
-		"  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()\n"
+		"  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()\n" +
+		"/\n" +
+		"  Cache-Control: " + cacheControl(ttl) + "\n" +
+		"/index.html\n" +
+		"  Cache-Control: " + cacheControl(ttl) + "\n" +
+		"/robots.txt\n" +
+		"  Cache-Control: " + cacheControl(ttl) + "\n" +
+		"/sitemap.xml\n" +
+		"  Cache-Control: " + cacheControl(ttl) + "\n" +
+		"/llms.txt\n" +
+		"  Cache-Control: " + cacheControl(ttl) + "\n" +
+		"/site.webmanifest\n" +
+		"  Cache-Control: " + cacheControl(ttl) + "\n" +
+		"/assets/*\n" +
+		"  Cache-Control: public, max-age=31536000, immutable\n" +
+		"/favicon.png\n" +
+		"  Cache-Control: public, max-age=31536000, immutable\n" +
+		"/favicon.svg\n" +
+		"  Cache-Control: public, max-age=31536000, immutable\n" +
+		"/apple-touch-icon.png\n" +
+		"  Cache-Control: public, max-age=31536000, immutable\n"
 }
 
 func vercelConfig(ttl int, allowExternalImages bool, allowTracking bool) string {
@@ -304,6 +323,18 @@ func vercelConfig(ttl int, allowExternalImages bool, allowTracking bool) string 
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "geolocation=(), microphone=(), camera=(), payment=()" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(favicon.png|favicon.svg|apple-touch-icon.png)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
   ]

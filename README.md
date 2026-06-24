@@ -2,7 +2,7 @@
 
 Mini-Link is a LittleLink-style link-in-bio page written in Go. It is designed to be small, fast, cache-friendly, and easy to host anywhere.
 
-It uses only the Go standard library. The rendered page has inline CSS and inline SVG icons, so the browser can load it with a single HTML request.
+It uses only the Go standard library. The rendered page has inline CSS and inline SVG icons, so the browser can load it with a single HTML request when you use built-in or inline custom icons.
 
 ## Features
 
@@ -10,9 +10,10 @@ It uses only the Go standard library. The rendered page has inline CSS and inlin
 - JSON, small YAML subset, and env configuration
 - strong ETag, Last-Modified, and CDN-friendly Cache-Control headers
 - precompiled inline SVG icon catalog
+- user-defined custom icons with inline SVG/path support
 - selectable `classic`, `glass`, and `terminal` templates
 - native dropdown groups without JavaScript
-- SEO-ready canonical, social metadata, JSON-LD, robots, and sitemap output
+- SEO-ready canonical, social metadata, JSON-LD, robots, sitemap, and `llms.txt` output
 - Docker, Docker Compose, Cloudflare Pages, Cloudflare Workers/static assets, Vercel, and manual deployment docs
 - MIT license
 
@@ -52,6 +53,8 @@ Extra examples:
 - `examples/minimal.yaml`
 - `examples/dropdowns.yaml`
 - `examples/dropdowns.json`
+- `examples/custom-icons.yaml`
+- `examples/custom-icons.json`
 - `examples/cloudflare/wrangler.toml`
 - `examples/cloudflare/pages.toml`
 
@@ -69,9 +72,15 @@ go run ./cmd/minilink icons -out docs/icons.html
 
 Then open `docs/icons.html`. See [docs/icons.md](docs/icons.md).
 
+External icon URLs are supported with `icon_url`, but they add browser requests and require a looser image CSP. Use inline custom icons when performance is the priority.
+
 ## Deployment
 
 See [docs/deployment.md](docs/deployment.md) for Docker, Docker Compose, manual Go builds, Cloudflare Pages, Cloudflare Workers/static assets, and Vercel. See [docs/cloudflare.md](docs/cloudflare.md) for a Cloudflare-specific tutorial.
+
+## SEO
+
+See [docs/seo.md](docs/seo.md) for generated SEO files, AI-readiness output, and the Lighthouse validation workflow.
 
 ## License
 

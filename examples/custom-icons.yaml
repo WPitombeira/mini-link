@@ -1,0 +1,33 @@
+name: Custom Icon Demo
+title: Mini-Link custom icon demo
+bio: Inline custom SVGs keep Mini-Link fast; external URLs are available when needed.
+avatar: CI
+base_url: https://links.example.com
+template: glass
+accent: "#0f766e"
+footer: Custom icons are configured by the user.
+cache_seconds: 300
+custom_icons:
+  - name: sparkle
+    label: Sparkle
+    source: User provided, MIT compatible
+    view_box: "0 0 24 24"
+    path: "M12 2 15 9 22 12 15 15 12 22 9 15 2 12 9 9Z"
+  - name: remote_logo
+    label: Remote Logo
+    source: User provided external SVG
+    url: https://cdn.example.com/remote-logo.svg
+links:
+  - title: Inline custom icon
+    url: https://example.com/inline
+    icon: sparkle
+    featured: true
+  - title: External custom icon by key
+    url: https://example.com/remote
+    icon: remote_logo
+  - title: External icon per link
+    url: https://example.com/direct
+    icon_url: https://cdn.example.com/direct-icon.svg
+  - title: Built-in fallback
+    url: https://github.com/WPitombeira/mini-link
+    icon: github

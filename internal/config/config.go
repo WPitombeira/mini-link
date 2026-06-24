@@ -17,29 +17,42 @@ import (
 )
 
 type Config struct {
-	Name         string `json:"name"`
-	Title        string `json:"title"`
-	Bio          string `json:"bio"`
-	Avatar       string `json:"avatar"`
-	BaseURL      string `json:"base_url"`
-	Template     string `json:"template"`
-	Accent       string `json:"accent"`
-	Footer       string `json:"footer"`
-	CacheSeconds int    `json:"cache_seconds"`
-	Links        []Link `json:"links"`
+	Name         string       `json:"name"`
+	Title        string       `json:"title"`
+	Bio          string       `json:"bio"`
+	Avatar       string       `json:"avatar"`
+	BaseURL      string       `json:"base_url"`
+	Template     string       `json:"template"`
+	Accent       string       `json:"accent"`
+	Footer       string       `json:"footer"`
+	CacheSeconds int          `json:"cache_seconds"`
+	CustomIcons  []CustomIcon `json:"custom_icons,omitempty"`
+	Links        []Link       `json:"links"`
 }
 
 type Link struct {
 	Title    string `json:"title"`
 	URL      string `json:"url"`
 	Icon     string `json:"icon"`
+	IconURL  string `json:"icon_url"`
 	Featured bool   `json:"featured"`
 	Open     bool   `json:"open"`
 	Rel      string `json:"rel"`
 	Links    []Link `json:"links,omitempty"`
 }
 
+type CustomIcon struct {
+	Name    string `json:"name"`
+	Label   string `json:"label"`
+	Source  string `json:"source"`
+	SVG     string `json:"svg"`
+	ViewBox string `json:"view_box"`
+	Path    string `json:"path"`
+	URL     string `json:"url"`
+}
+
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+var iconNamePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 
 func Default() Config {
 	return Config{
@@ -137,8 +150,17 @@ func normalize(cfg Config) (Config, error) {
 	if cfg.CacheSeconds <= 0 {
 		cfg.CacheSeconds = 300
 	}
+	customIcons, err := normalizeCustomIcons(cfg.CustomIcons)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.CustomIcons = customIcons
+	customIconNames := map[string]bool{}
+	for _, icon := range cfg.CustomIcons {
+		customIconNames[icon.Name] = true
+	}
 	for i := range cfg.Links {
-		if err := normalizeLink(&cfg.Links[i], fmt.Sprintf("links[%d]", i), 1); err != nil {
+		if err := normalizeLink(&cfg.Links[i], fmt.Sprintf("links[%d]", i), 1, customIconNames); err != nil {
 			return Config{}, err
 		}
 	}
@@ -148,13 +170,83 @@ func normalize(cfg Config) (Config, error) {
 	return cfg, nil
 }
 
-func normalizeLink(link *Link, path string, depth int) error {
+func normalizeCustomIcons(input []CustomIcon) ([]CustomIcon, error) {
+	if len(input) == 0 {
+		return nil, nil
+	}
+	seen := map[string]bool{}
+	out := make([]CustomIcon, 0, len(input))
+	for i, icon := range input {
+		where := fmt.Sprintf("custom_icons[%d]", i)
+		icon.Name = strings.TrimSpace(strings.ToLower(icon.Name))
+		icon.Label = strings.TrimSpace(icon.Label)
+		icon.Source = strings.TrimSpace(icon.Source)
+		icon.SVG = strings.TrimSpace(icon.SVG)
+		icon.ViewBox = strings.TrimSpace(icon.ViewBox)
+		icon.Path = strings.TrimSpace(icon.Path)
+		icon.URL = strings.TrimSpace(icon.URL)
+		if icon.Name == "" {
+			return nil, fmt.Errorf("%s.name is required", where)
+		}
+		if !iconNamePattern.MatchString(icon.Name) {
+			return nil, fmt.Errorf("%s.name must use lowercase letters, numbers, dashes, or underscores", where)
+		}
+		if _, ok := icons.Get(icon.Name); ok {
+			return nil, fmt.Errorf("%s.name %q conflicts with built-in icon catalog", where, icon.Name)
+		}
+		if seen[icon.Name] {
+			return nil, fmt.Errorf("%s.name %q is duplicated", where, icon.Name)
+		}
+		seen[icon.Name] = true
+		if icon.Label == "" {
+			icon.Label = icon.Name
+		}
+		forms := 0
+		if icon.SVG != "" {
+			forms++
+			if err := validateInlineSVG(icon.SVG); err != nil {
+				return nil, fmt.Errorf("%s.svg: %w", where, err)
+			}
+		}
+		if icon.Path != "" || icon.ViewBox != "" {
+			forms++
+			if icon.Path == "" || icon.ViewBox == "" {
+				return nil, fmt.Errorf("%s path icons require both path and view_box", where)
+			}
+			if err := validateSVGPart(icon.ViewBox, "view_box"); err != nil {
+				return nil, fmt.Errorf("%s.%w", where, err)
+			}
+			if err := validateSVGPart(icon.Path, "path"); err != nil {
+				return nil, fmt.Errorf("%s.%w", where, err)
+			}
+		}
+		if icon.URL != "" {
+			forms++
+			if err := validateAbsoluteHTTPURL(icon.URL); err != nil {
+				return nil, fmt.Errorf("%s.url: %w", where, err)
+			}
+		}
+		if forms != 1 {
+			return nil, fmt.Errorf("%s must define exactly one of svg, path plus view_box, or url", where)
+		}
+		out = append(out, icon)
+	}
+	return out, nil
+}
+
+func normalizeLink(link *Link, path string, depth int, customIconNames map[string]bool) error {
 	if depth > 3 {
 		return fmt.Errorf("%s exceeds maximum dropdown depth of 3", path)
 	}
 	link.Title = strings.TrimSpace(link.Title)
 	link.URL = strings.TrimSpace(link.URL)
-	link.Icon = strings.TrimSpace(strings.ToLower(link.Icon))
+	link.Icon = strings.TrimSpace(link.Icon)
+	link.IconURL = strings.TrimSpace(link.IconURL)
+	if link.IconURL == "" && isHTTPURL(link.Icon) {
+		link.IconURL = link.Icon
+		link.Icon = ""
+	}
+	link.Icon = strings.ToLower(link.Icon)
 	link.Rel = strings.TrimSpace(link.Rel)
 	if link.Title == "" {
 		return fmt.Errorf("%s.title is required", path)
@@ -166,11 +258,15 @@ func normalizeLink(link *Link, path string, depth int) error {
 		if link.Icon == "" {
 			link.Icon = "link"
 		}
-		if _, ok := icons.Get(link.Icon); !ok {
-			return fmt.Errorf("%s.icon %q is not in the SVG catalog", path, link.Icon)
+		if link.IconURL != "" {
+			if err := validateAbsoluteHTTPURL(link.IconURL); err != nil {
+				return fmt.Errorf("%s.icon_url: %w", path, err)
+			}
+		} else if !iconExists(link.Icon, customIconNames) {
+			return fmt.Errorf("%s.icon %q is not in the SVG catalog or custom_icons", path, link.Icon)
 		}
 		for i := range link.Links {
-			if err := normalizeLink(&link.Links[i], fmt.Sprintf("%s.links[%d]", path, i), depth+1); err != nil {
+			if err := normalizeLink(&link.Links[i], fmt.Sprintf("%s.links[%d]", path, i), depth+1, customIconNames); err != nil {
 				return err
 			}
 		}
@@ -185,13 +281,52 @@ func normalizeLink(link *Link, path string, depth int) error {
 	if link.Icon == "" {
 		link.Icon = "link"
 	}
-	if _, ok := icons.Get(link.Icon); !ok {
-		return fmt.Errorf("%s.icon %q is not in the SVG catalog", path, link.Icon)
+	if link.IconURL != "" {
+		if err := validateAbsoluteHTTPURL(link.IconURL); err != nil {
+			return fmt.Errorf("%s.icon_url: %w", path, err)
+		}
+	} else if !iconExists(link.Icon, customIconNames) {
+		return fmt.Errorf("%s.icon %q is not in the SVG catalog or custom_icons", path, link.Icon)
 	}
 	if link.Rel == "" {
 		link.Rel = "me noopener noreferrer"
 	} else if strings.HasPrefix(link.URL, "http://") || strings.HasPrefix(link.URL, "https://") {
 		link.Rel = ensureRelTokens(link.Rel, "noopener", "noreferrer")
+	}
+	return nil
+}
+
+func iconExists(name string, customIconNames map[string]bool) bool {
+	if _, ok := icons.Get(name); ok {
+		return true
+	}
+	return customIconNames[name]
+}
+
+func validateInlineSVG(svg string) error {
+	lower := strings.ToLower(svg)
+	if !strings.HasPrefix(lower, "<svg ") && !strings.HasPrefix(lower, "<svg>") {
+		return errors.New("must start with <svg")
+	}
+	if !strings.Contains(lower, "</svg>") {
+		return errors.New("must include closing </svg>")
+	}
+	blocked := []string{"<script", "<foreignobject", "<iframe", "<object", "<embed", "<image", "<style", " onload=", " onclick=", " onerror=", " href=", " xlink:href=", "javascript:"}
+	for _, token := range blocked {
+		if strings.Contains(lower, token) {
+			return fmt.Errorf("blocked unsafe SVG token %q", token)
+		}
+	}
+	return nil
+}
+
+func validateSVGPart(value string, name string) error {
+	lower := strings.ToLower(value)
+	blocked := []string{"<", ">", `"`, "'", "javascript:", "onload", "onclick", "onerror"}
+	for _, token := range blocked {
+		if strings.Contains(lower, token) {
+			return fmt.Errorf("%s contains unsafe token %q", name, token)
+		}
 	}
 	return nil
 }
@@ -275,6 +410,10 @@ func validateAbsoluteHTTPURL(raw string) error {
 	return nil
 }
 
+func isHTTPURL(raw string) bool {
+	return strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://")
+}
+
 func merge(base Config, next Config) Config {
 	if next.Name != "" {
 		base.Name = next.Name
@@ -302,6 +441,9 @@ func merge(base Config, next Config) Config {
 	}
 	if next.CacheSeconds != 0 {
 		base.CacheSeconds = next.CacheSeconds
+	}
+	if next.CustomIcons != nil {
+		base.CustomIcons = next.CustomIcons
 	}
 	if next.Links != nil {
 		base.Links = next.Links
@@ -335,6 +477,13 @@ func loadEnv(base Config, entries []string) (Config, error) {
 		}
 		cfg.CacheSeconds = ttl
 	}
+	if raw := values["MINI_LINK_CUSTOM_ICONS_JSON"]; raw != "" {
+		var customIcons []CustomIcon
+		if err := json.Unmarshal([]byte(raw), &customIcons); err != nil {
+			return Config{}, fmt.Errorf("MINI_LINK_CUSTOM_ICONS_JSON: %w", err)
+		}
+		cfg.CustomIcons = customIcons
+	}
 	if raw := values["MINI_LINK_LINKS_JSON"]; raw != "" {
 		var links []Link
 		if err := json.Unmarshal([]byte(raw), &links); err != nil {
@@ -361,7 +510,8 @@ func numberedLinks(values map[string]string) []Link {
 		links = append(links, Link{
 			Title:    title,
 			URL:      url,
-			Icon:     values[prefix+"ICON"],
+			Icon:     first(values, prefix+"ICON", ""),
+			IconURL:  first(values, prefix+"ICON_URL", ""),
 			Rel:      values[prefix+"REL"],
 			Featured: featured,
 			Open:     open,
@@ -380,6 +530,27 @@ func CountLinks(links []Link) int {
 		count++
 	}
 	return count
+}
+
+func HasExternalIcons(cfg Config) bool {
+	for _, icon := range cfg.CustomIcons {
+		if icon.URL != "" {
+			return true
+		}
+	}
+	return linksHaveExternalIcons(cfg.Links)
+}
+
+func linksHaveExternalIcons(links []Link) bool {
+	for _, link := range links {
+		if link.IconURL != "" || isHTTPURL(link.Icon) {
+			return true
+		}
+		if linksHaveExternalIcons(link.Links) {
+			return true
+		}
+	}
+	return false
 }
 
 func parseDotEnv(raw string) ([]string, error) {

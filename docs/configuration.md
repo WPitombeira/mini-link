@@ -13,6 +13,7 @@ Common fields:
 - `accent`
 - `footer`
 - `cache_seconds`
+- `custom_icons`
 - `links`
 
 ## JSON
@@ -67,6 +68,12 @@ MINI_LINK_LINK_1_REL
 
 For larger env-only deployments, use `MINI_LINK_LINKS_JSON` with a JSON array of links.
 
+Custom icons in env files use JSON:
+
+```text
+MINI_LINK_CUSTOM_ICONS_JSON=[{"name":"sparkle","view_box":"0 0 24 24","path":"M12 2 15 9 22 12 15 15 12 22 9 15 2 12 9 9Z"}]
+```
+
 ## Dropdowns
 
 A link can either point directly to a `url`, or it can be a dropdown group with nested `links`. Dropdowns render with native HTML `<details>` and `<summary>`, so they work without JavaScript.
@@ -93,3 +100,36 @@ Dropdown rules:
 - nesting is limited to three levels to keep the page readable
 
 Env files can use `MINI_LINK_LINKS_JSON` for dropdowns because numbered env variables are intentionally flat.
+
+## Custom Icons
+
+Custom icons can be defined once and reused by `icon` key:
+
+```yaml
+custom_icons:
+  - name: sparkle
+    label: Sparkle
+    view_box: "0 0 24 24"
+    path: "M12 2 15 9 22 12 15 15 12 22 9 15 2 12 9 9Z"
+links:
+  - title: Custom
+    url: https://example.com
+    icon: sparkle
+```
+
+Supported custom icon forms:
+
+- `view_box` plus `path`: preferred, safest, rendered as inline SVG
+- `svg`: full inline SVG, accepted only when it passes safety checks
+- `url`: external SVG/image URL, rendered as an `<img>`
+
+Links can also define a one-off external icon:
+
+```yaml
+links:
+  - title: CDN icon
+    url: https://example.com
+    icon_url: https://cdn.example.com/icon.svg
+```
+
+External icon URLs add browser requests and require a looser `img-src` Content Security Policy. They are supported for flexibility, but built-in icons and inline custom icons preserve Mini-Link's fastest one-request behavior.

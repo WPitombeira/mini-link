@@ -9,9 +9,12 @@ import (
 
 func parseYAML(raw string) (Config, error) {
 	var cfg Config
+	var customIcons []CustomIcon
+	var currentIcon *CustomIcon
 	var links []Link
 	var stack []linkFrame
 	inLinks := false
+	inCustomIcons := false
 
 	scanner := bufio.NewScanner(strings.NewReader(raw))
 	lineNo := 0
@@ -33,17 +36,54 @@ func parseYAML(raw string) (Config, error) {
 			value = strings.TrimSpace(value)
 			if key == "links" {
 				inLinks = true
+				inCustomIcons = false
+				continue
+			}
+			if key == "custom_icons" {
+				inCustomIcons = true
+				inLinks = false
 				continue
 			}
 			inLinks = false
+			inCustomIcons = false
 			if err := setConfigScalar(&cfg, key, value); err != nil {
 				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
 			}
 			continue
 		}
 
+		if inCustomIcons {
+			if strings.HasPrefix(trimmed, "- ") {
+				customIcons = append(customIcons, CustomIcon{})
+				currentIcon = &customIcons[len(customIcons)-1]
+				rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+				if rest == "" {
+					continue
+				}
+				key, value, ok := strings.Cut(rest, ":")
+				if !ok {
+					return Config{}, fmt.Errorf("line %d: expected - key: value", lineNo)
+				}
+				if err := setCustomIconScalar(currentIcon, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
+					return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
+				}
+				continue
+			}
+			if currentIcon == nil {
+				return Config{}, fmt.Errorf("line %d: custom icon item must start with -", lineNo)
+			}
+			key, value, ok := strings.Cut(trimmed, ":")
+			if !ok {
+				return Config{}, fmt.Errorf("line %d: expected key: value", lineNo)
+			}
+			if err := setCustomIconScalar(currentIcon, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
+				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
+			}
+			continue
+		}
+
 		if !inLinks {
-			return Config{}, fmt.Errorf("line %d: nested values are only supported under links", lineNo)
+			return Config{}, fmt.Errorf("line %d: nested values are only supported under custom_icons or links", lineNo)
 		}
 		if strings.HasPrefix(trimmed, "- ") {
 			parent := currentParent(stack, indent)
@@ -90,6 +130,9 @@ func parseYAML(raw string) (Config, error) {
 	}
 	if links != nil {
 		cfg.Links = links
+	}
+	if customIcons != nil {
+		cfg.CustomIcons = customIcons
 	}
 	return cfg, nil
 }
@@ -153,6 +196,8 @@ func setLinkScalar(link *Link, key string, value string) error {
 		link.URL = unquote(value)
 	case "icon":
 		link.Icon = unquote(value)
+	case "icon_url":
+		link.IconURL = unquote(value)
 	case "rel":
 		link.Rel = unquote(value)
 	case "featured":
@@ -169,6 +214,28 @@ func setLinkScalar(link *Link, key string, value string) error {
 		link.Open = parsed
 	default:
 		return fmt.Errorf("unknown link key %q", key)
+	}
+	return nil
+}
+
+func setCustomIconScalar(icon *CustomIcon, key string, value string) error {
+	switch key {
+	case "name":
+		icon.Name = unquote(value)
+	case "label":
+		icon.Label = unquote(value)
+	case "source":
+		icon.Source = unquote(value)
+	case "svg":
+		icon.SVG = unquote(value)
+	case "view_box":
+		icon.ViewBox = unquote(value)
+	case "path":
+		icon.Path = unquote(value)
+	case "url":
+		icon.URL = unquote(value)
+	default:
+		return fmt.Errorf("unknown custom icon key %q", key)
 	}
 	return nil
 }

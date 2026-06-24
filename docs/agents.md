@@ -11,6 +11,8 @@ go run ./cmd/minilink validate -config examples/mini-link.json
 go run ./cmd/minilink validate -config examples/mini-link.env.example
 go run ./cmd/minilink validate -config examples/dropdowns.yaml
 go run ./cmd/minilink validate -config examples/dropdowns.json
+go run ./cmd/minilink validate -config examples/custom-icons.yaml
+go run ./cmd/minilink validate -config examples/custom-icons.json
 go run ./cmd/minilink validate -config examples/minimal.yaml
 go run ./cmd/minilink icons -out docs/icons.html
 go run ./cmd/minilink export -config examples/mini-link.yaml -out dist
@@ -28,10 +30,12 @@ Then check:
 - a featured link has distinct styling.
 - dropdown groups open and close with mouse and keyboard.
 - SVG icons render inline.
+- custom inline icons render without extra requests.
+- external icon URLs render only when configured and CSP includes `img-src`.
 - link clicks navigate to the expected targets.
 - refreshing with `If-None-Match` returns `304`.
 - mobile width has no overflow.
-- `/robots.txt` and `/sitemap.xml` render when `base_url` is configured.
+- `/robots.txt`, `/sitemap.xml`, and `/llms.txt` render when `base_url` is configured.
 - Lighthouse Performance, Accessibility, Best Practices, and SEO score 100 on the served page.
 
 ## Release Checklist

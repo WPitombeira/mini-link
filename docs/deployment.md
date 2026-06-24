@@ -21,6 +21,7 @@ Static export writes:
 - `index.html`
 - `robots.txt`
 - `sitemap.xml`
+- `llms.txt`
 - `_headers` for Cloudflare Pages and compatible hosts
 - `vercel.json` for Vercel header configuration
 
@@ -109,6 +110,6 @@ Static export writes equivalent platform headers. Increase `cache_seconds` when 
 
 ## SEO and Security Headers
 
-Mini-Link emits canonical, Open Graph, Twitter Card, and JSON-LD metadata on the page. Server mode and static export also provide `robots.txt` and `sitemap.xml` when `base_url` is configured.
+Mini-Link emits canonical, Open Graph, Twitter Card, and JSON-LD metadata on the page. Server mode and static export also provide `robots.txt`, `sitemap.xml`, and `llms.txt` when `base_url` is configured.
 
-The default security headers are intentionally strict because Mini-Link does not need client JavaScript, frames, forms, camera, microphone, geolocation, or payment APIs.
+The default security headers are intentionally strict because Mini-Link does not need client JavaScript, frames, forms, camera, microphone, geolocation, or payment APIs. If external icon URLs are configured, Mini-Link adds `img-src 'self' https: data:` so those images can load.

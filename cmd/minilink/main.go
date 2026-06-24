@@ -75,6 +75,7 @@ func serve(args []string) error {
 	}
 	etag := strongETag(page)
 	started := time.Now().UTC()
+	allowExternalImages := config.HasExternalIcons(cfg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -82,13 +83,16 @@ func serve(args []string) error {
 			http.NotFound(w, r)
 			return
 		}
-		writeHTML(w, r, page, etag, started, cfg.CacheSeconds)
+		writeHTML(w, r, page, etag, started, cfg.CacheSeconds, allowExternalImages)
 	})
 	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
-		writeText(w, []byte(robotsTXT(cfg)), "text/plain; charset=utf-8", cfg.CacheSeconds)
+		writeText(w, []byte(robotsTXT(cfg)), "text/plain; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
 	})
 	mux.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
-		writeText(w, []byte(sitemapXML(cfg, started)), "application/xml; charset=utf-8", cfg.CacheSeconds)
+		writeText(w, []byte(sitemapXML(cfg, started)), "application/xml; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
+	})
+	mux.HandleFunc("/llms.txt", func(w http.ResponseWriter, r *http.Request) {
+		writeText(w, []byte(llmsTXT(cfg)), "text/markdown; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
 	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -130,16 +134,20 @@ func export(args []string) error {
 	if err := os.WriteFile(filepath.Join(*out, "index.html"), page, 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(*out, "_headers"), []byte(headersFile(cfg.CacheSeconds)), 0o644); err != nil {
+	allowExternalImages := config.HasExternalIcons(cfg)
+	if err := os.WriteFile(filepath.Join(*out, "_headers"), []byte(headersFile(cfg.CacheSeconds, allowExternalImages)), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(*out, "vercel.json"), []byte(vercelConfig(cfg.CacheSeconds)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(*out, "vercel.json"), []byte(vercelConfig(cfg.CacheSeconds, allowExternalImages)), 0o644); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(*out, "robots.txt"), []byte(robotsTXT(cfg)), 0o644); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(*out, "sitemap.xml"), []byte(sitemapXML(cfg, time.Now().UTC())), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(*out, "llms.txt"), []byte(llmsTXT(cfg)), 0o644); err != nil {
 		return err
 	}
 	fmt.Printf("exported %s\n", filepath.Clean(*out))
@@ -183,11 +191,11 @@ func validate(args []string) error {
 	return nil
 }
 
-func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string, modified time.Time, ttl int) {
+func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string, modified time.Time, ttl int, allowExternalImages bool) {
 	w.Header().Set("Cache-Control", cacheControl(ttl))
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
-	securityHeaders(w.Header())
+	securityHeaders(w.Header(), allowExternalImages)
 	if match := r.Header.Get("If-None-Match"); match == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -204,10 +212,10 @@ func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string,
 	_, _ = w.Write(page)
 }
 
-func writeText(w http.ResponseWriter, body []byte, contentType string, ttl int) {
+func writeText(w http.ResponseWriter, body []byte, contentType string, ttl int, allowExternalImages bool) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", cacheControl(ttl))
-	securityHeaders(w.Header())
+	securityHeaders(w.Header(), allowExternalImages)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
@@ -224,16 +232,16 @@ func cacheControl(ttl int) string {
 	return fmt.Sprintf("public, max-age=%d, s-maxage=%d, stale-while-revalidate=604800", ttl, ttl*288)
 }
 
-func headersFile(ttl int) string {
+func headersFile(ttl int, allowExternalImages bool) string {
 	return "/*\n" +
 		"  Cache-Control: " + cacheControl(ttl) + "\n" +
-		"  Content-Security-Policy: " + contentSecurityPolicy() + "\n" +
+		"  Content-Security-Policy: " + contentSecurityPolicy(allowExternalImages) + "\n" +
 		"  X-Content-Type-Options: nosniff\n" +
 		"  Referrer-Policy: strict-origin-when-cross-origin\n" +
 		"  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()\n"
 }
 
-func vercelConfig(ttl int) string {
+func vercelConfig(ttl int, allowExternalImages bool) string {
 	return fmt.Sprintf(`{
   "headers": [
     {
@@ -248,18 +256,22 @@ func vercelConfig(ttl int) string {
     }
   ]
 }
-`, cacheControl(ttl), contentSecurityPolicy())
+`, cacheControl(ttl), contentSecurityPolicy(allowExternalImages))
 }
 
-func securityHeaders(header http.Header) {
-	header.Set("Content-Security-Policy", contentSecurityPolicy())
+func securityHeaders(header http.Header, allowExternalImages bool) {
+	header.Set("Content-Security-Policy", contentSecurityPolicy(allowExternalImages))
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	header.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()")
 }
 
-func contentSecurityPolicy() string {
-	return "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+func contentSecurityPolicy(allowExternalImages bool) string {
+	policy := "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	if allowExternalImages {
+		policy += "; img-src 'self' https: data:"
+	}
+	return policy
 }
 
 func robotsTXT(cfg config.Config) string {
@@ -290,6 +302,46 @@ func sitemapXML(cfg config.Config, modified time.Time) string {
 func xmlEscape(value string) string {
 	replacer := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;", "'", "&apos;")
 	return replacer.Replace(value)
+}
+
+func llmsTXT(cfg config.Config) string {
+	var b strings.Builder
+	base := strings.TrimRight(cfg.BaseURL, "/")
+	if base == "" {
+		base = "/"
+	}
+	fmt.Fprintf(&b, "# %s\n\n", cfg.Title)
+	if cfg.Bio != "" {
+		fmt.Fprintf(&b, "> %s\n\n", cfg.Bio)
+	}
+	fmt.Fprintf(&b, "Mini-Link profile for %s.\n\n", cfg.Name)
+	fmt.Fprintf(&b, "## Primary URL\n\n- [%s](%s)\n\n", cfg.Name, base)
+	links := publicLinks(cfg.Links)
+	if len(links) > 0 {
+		b.WriteString("## Public Links\n\n")
+		for _, link := range links {
+			fmt.Fprintf(&b, "- [%s](%s)\n", link.Title, link.URL)
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("## Machine Readable Files\n\n")
+	fmt.Fprintf(&b, "- [Sitemap](%s/sitemap.xml)\n", strings.TrimRight(base, "/"))
+	fmt.Fprintf(&b, "- [Robots](%s/robots.txt)\n", strings.TrimRight(base, "/"))
+	return b.String()
+}
+
+func publicLinks(links []config.Link) []config.Link {
+	var out []config.Link
+	for _, link := range links {
+		if len(link.Links) > 0 {
+			out = append(out, publicLinks(link.Links)...)
+			continue
+		}
+		if strings.HasPrefix(link.URL, "http://") || strings.HasPrefix(link.URL, "https://") {
+			out = append(out, link)
+		}
+	}
+	return out
 }
 
 func envDefault(key string, fallback string) string {

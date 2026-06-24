@@ -3,6 +3,7 @@ package render
 import (
 	"bytes"
 	"encoding/json"
+	"html"
 	"html/template"
 	"net/url"
 	"strings"
@@ -24,13 +25,14 @@ type pageData struct {
 type linkData struct {
 	config.Link
 	Icon     template.HTML
+	IconURL  string
 	Host     string
 	New      bool
 	Children []linkData
 }
 
 func Page(cfg config.Config) ([]byte, error) {
-	links := buildLinks(cfg.Links)
+	links := buildLinks(cfg.Links, customIconMap(cfg.CustomIcons))
 
 	data := pageData{
 		Config:      cfg,
@@ -47,22 +49,60 @@ func Page(cfg config.Config) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-func buildLinks(links []config.Link) []linkData {
+func buildLinks(links []config.Link, customIcons map[string]customIcon) []linkData {
 	out := make([]linkData, 0, len(links))
 	for _, link := range links {
-		icon, ok := icons.Get(link.Icon)
-		if !ok {
-			icon, _ = icons.Get("link")
-		}
+		icon, iconURL := resolveIcon(link, customIcons)
 		out = append(out, linkData{
 			Link:     link,
-			Icon:     template.HTML(icon.SVG),
+			Icon:     icon,
+			IconURL:  iconURL,
 			Host:     host(link.URL),
 			New:      opensNewTab(link.URL),
-			Children: buildLinks(link.Links),
+			Children: buildLinks(link.Links, customIcons),
 		})
 	}
 	return out
+}
+
+type customIcon struct {
+	SVG string
+	URL string
+}
+
+func customIconMap(items []config.CustomIcon) map[string]customIcon {
+	out := make(map[string]customIcon, len(items))
+	for _, item := range items {
+		out[item.Name] = customIcon{SVG: customIconSVG(item), URL: item.URL}
+	}
+	return out
+}
+
+func customIconSVG(item config.CustomIcon) string {
+	if item.SVG != "" {
+		return item.SVG
+	}
+	if item.Path == "" {
+		return ""
+	}
+	return `<svg viewBox="` + html.EscapeString(item.ViewBox) + `" aria-hidden="true"><path d="` + html.EscapeString(item.Path) + `"/></svg>`
+}
+
+func resolveIcon(link config.Link, customIcons map[string]customIcon) (template.HTML, string) {
+	if link.IconURL != "" {
+		return "", link.IconURL
+	}
+	if item, ok := customIcons[link.Icon]; ok {
+		if item.URL != "" {
+			return "", item.URL
+		}
+		return template.HTML(item.SVG), ""
+	}
+	icon, ok := icons.Get(link.Icon)
+	if !ok {
+		icon, _ = icons.Get("link")
+	}
+	return template.HTML(icon.SVG), ""
 }
 
 func opensNewTab(raw string) bool {
@@ -119,21 +159,29 @@ func schemaJSON(cfg config.Config, links []linkData) string {
 
 func externalURLs(links []linkData) []string {
 	var urls []string
+	seen := map[string]bool{}
+	collectExternalURLs(links, seen, &urls)
+	return urls
+}
+
+func collectExternalURLs(links []linkData, seen map[string]bool, urls *[]string) {
 	for _, link := range links {
 		if len(link.Children) > 0 {
-			urls = append(urls, externalURLs(link.Children)...)
+			collectExternalURLs(link.Children, seen, urls)
 			continue
 		}
 		if strings.HasPrefix(link.URL, "https://") || strings.HasPrefix(link.URL, "http://") {
-			urls = append(urls, link.URL)
+			if !seen[link.URL] {
+				seen[link.URL] = true
+				*urls = append(*urls, link.URL)
+			}
 		}
 	}
-	return urls
 }
 
 var pageTemplate = template.Must(template.New("page").Parse(`{{define "linkItem"}}{{if .Children}}<details class="dropdown{{if .Featured}} featured{{end}}"{{if .Open}} open{{end}}>
 <summary>
-<span class="icon">{{.Icon}}</span>
+<span class="icon">{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="lazy" decoding="async">{{else}}{{.Icon}}{{end}}</span>
 <span class="label"><span class="title">{{.Title}}</span><span class="host">{{len .Children}} links</span></span>
 <span class="chevron" aria-hidden="true">⌄</span>
 </summary>
@@ -141,7 +189,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`{{define "linkItem"
 {{range .Children}}{{template "linkItem" .}}{{end}}</div>
 </details>
 {{else}}<a class="link{{if .Featured}} featured{{end}}" href="{{.URL}}" rel="{{.Rel}}"{{if .New}} target="_blank"{{end}}>
-<span class="icon">{{.Icon}}</span>
+<span class="icon">{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="lazy" decoding="async">{{else}}{{.Icon}}{{end}}</span>
 <span class="label"><span class="title">{{.Title}}</span><span class="host">{{.Host}}</span></span>
 <span class="arrow" aria-hidden="true">›</span>
 </a>
@@ -207,6 +255,7 @@ h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing
 .dropdown:not(.featured) summary .host{display:none}
 .icon{width:22px;height:22px;color:currentColor;display:grid;place-items:center}
 .icon svg{width:22px;height:22px;display:block;fill:currentColor}
+.icon img{width:22px;height:22px;display:block;object-fit:contain}
 .label{display:grid;gap:1px;min-width:0}
 .title{font-size:15px;font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .host{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -227,7 +276,7 @@ footer a{min-height:48px;display:inline-flex;align-items:center;color:var(--text
 <body class="{{.Template}}">
 <main>
 <header class="topbar">
-<span class="brand"><span class="icon">{{with index .Links 0}}{{.Icon}}{{end}}</span> Mini-Link</span>
+<span class="brand"><span class="icon">{{with index .Links 0}}{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="lazy" decoding="async">{{else}}{{.Icon}}{{end}}{{end}}</span> Mini-Link</span>
 <span class="menu" aria-hidden="true">≡</span>
 </header>
 <section class="profile">

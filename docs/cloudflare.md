@@ -1,6 +1,6 @@
 # Cloudflare Deployment
 
-Mini-Link is a good fit for Cloudflare because the exported site is static: `index.html`, `robots.txt`, `sitemap.xml`, and platform header files. Use Pages when you want the simplest Git-backed static deployment. Use Workers Static Assets when you want a Worker project and Wrangler-driven deploys.
+Mini-Link is a good fit for Cloudflare because the exported site is static: `index.html`, `robots.txt`, `sitemap.xml`, `llms.txt`, and platform header files. Use Pages when you want the simplest Git-backed static deployment. Use Workers Static Assets when you want a Worker project and Wrangler-driven deploys.
 
 ## Prepare the Site
 
@@ -23,6 +23,7 @@ Expected files:
 - `index.html`
 - `robots.txt`
 - `sitemap.xml`
+- `llms.txt`
 - `_headers`
 - `vercel.json`
 
@@ -87,6 +88,7 @@ Then export and deploy again so `sitemap.xml`, canonical URL, Open Graph URL, an
 curl -I https://links.example.com
 curl https://links.example.com/robots.txt
 curl https://links.example.com/sitemap.xml
+curl https://links.example.com/llms.txt
 ```
 
 Confirm:
@@ -95,6 +97,7 @@ Confirm:
 - `Content-Security-Policy` is present.
 - `robots.txt` references the production sitemap URL.
 - `sitemap.xml` contains the production `base_url`.
+- `llms.txt` lists the production URL and public HTTP links.
 
 ## Cache Behavior
 

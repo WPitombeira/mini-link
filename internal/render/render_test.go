@@ -68,6 +68,41 @@ func TestPageRendersDropdowns(t *testing.T) {
 	}
 }
 
+func TestPageRendersCustomAndExternalIcons(t *testing.T) {
+	cfg := config.Default()
+	cfg.CustomIcons = []config.CustomIcon{
+		{
+			Name:    "spark",
+			Label:   "Spark",
+			ViewBox: "0 0 24 24",
+			Path:    "M12 2 15 9 22 12 15 15 12 22 9 15 2 12 9 9Z",
+		},
+		{
+			Name: "remote",
+			URL:  "https://cdn.example.com/icon.svg",
+		},
+	}
+	cfg.Links = []config.Link{
+		{Title: "Inline", URL: "https://example.com", Icon: "spark"},
+		{Title: "Remote", URL: "https://example.com/remote", Icon: "remote"},
+		{Title: "Direct", URL: "https://example.com/direct", IconURL: "https://cdn.example.com/direct.svg"},
+	}
+	page, err := Page(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(page)
+	if !strings.Contains(html, `<path d="M12 2 15 9 22 12 15 15 12 22 9 15 2 12 9 9Z"`) {
+		t.Fatal("missing path-based custom icon")
+	}
+	if !strings.Contains(html, `<img src="https://cdn.example.com/icon.svg" alt="" loading="lazy" decoding="async">`) {
+		t.Fatal("missing custom external icon")
+	}
+	if !strings.Contains(html, `<img src="https://cdn.example.com/direct.svg" alt="" loading="lazy" decoding="async">`) {
+		t.Fatal("missing direct external icon")
+	}
+}
+
 func TestIconCatalogIncludesKeys(t *testing.T) {
 	html, err := IconCatalog(icons.All())
 	if err != nil {

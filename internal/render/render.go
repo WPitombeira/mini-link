@@ -21,6 +21,7 @@ type pageData struct {
 	Template    string
 	Schema      template.JS
 	Favicons    []FaviconLink
+	GoogleAdsID string
 }
 
 type FaviconLink struct {
@@ -60,6 +61,7 @@ func PageWithAssets(cfg config.Config, assets Assets) ([]byte, error) {
 		Template:    "theme-" + cfg.Template,
 		Schema:      template.JS(schemaJSON(cfg, links)),
 		Favicons:    assets.Favicons,
+		GoogleAdsID: cfg.Tracking.GoogleAdsID,
 	}
 
 	var buf bytes.Buffer
@@ -250,6 +252,9 @@ var pageTemplate = template.Must(template.New("page").Parse(`{{define "linkItem"
 {{end}}<link rel="manifest" href="/site.webmanifest">
 <title>{{.Config.Title}}</title>
 <script type="application/ld+json">{{.Schema}}</script>
+{{if .GoogleAdsID}}<script async src="https://www.googletagmanager.com/gtag/js?id={{.GoogleAdsID}}"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date);gtag("config","{{.GoogleAdsID}}");</script>
+{{end}}
 <style>
 :root{--accent:{{.Config.Accent}};--bg:#fff;--text:#111827;--muted:#5b6472;--line:#d8dee8;--soft:#f8fafc;--shadow:0 16px 44px rgba(17,24,39,.10);--radius:18px}
 *{box-sizing:border-box}

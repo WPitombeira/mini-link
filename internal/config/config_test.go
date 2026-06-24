@@ -139,6 +139,31 @@ links:
 	}
 }
 
+func TestLoadYAMLTracking(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "tracking.yaml")
+	if err := os.WriteFile(path, []byte(`name: Tracked Profile
+tracking:
+  google_ads_id: AW-123456789
+links:
+  - title: Website
+    url: https://example.com
+    icon: globe
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Tracking.GoogleAdsID != "AW-123456789" {
+		t.Fatalf("google_ads_id = %q", cfg.Tracking.GoogleAdsID)
+	}
+	if !HasTracking(cfg) {
+		t.Fatal("expected tracking to be enabled")
+	}
+}
+
 func TestLoadFaviconAndAssetUploadYAML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "assets.yaml")

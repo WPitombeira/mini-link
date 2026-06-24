@@ -38,6 +38,8 @@ For best scores, use export-time favicon processing instead of a runtime externa
 
 Mini-Link keeps JavaScript disabled by default. Dropdowns use native `<details>` and `<summary>`.
 
+Google Ads tracking is opt-in. Enabling `tracking.google_ads_id` adds the Google tag script and the network requests required by Google Ads, so keep it disabled unless the profile needs conversion or remarketing data.
+
 ## Validation Workflow
 
 ```bash

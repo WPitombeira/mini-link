@@ -20,6 +20,7 @@ func parseYAML(raw string) (Config, error) {
 	inStaticAssets := false
 	inFavicon := false
 	inAssetUpload := false
+	inTracking := false
 
 	scanner := bufio.NewScanner(strings.NewReader(raw))
 	lineNo := 0
@@ -45,6 +46,7 @@ func parseYAML(raw string) (Config, error) {
 				inStaticAssets = false
 				inFavicon = false
 				inAssetUpload = false
+				inTracking = false
 				continue
 			}
 			if key == "custom_icons" {
@@ -53,6 +55,7 @@ func parseYAML(raw string) (Config, error) {
 				inStaticAssets = false
 				inFavicon = false
 				inAssetUpload = false
+				inTracking = false
 				continue
 			}
 			if key == "static_assets" {
@@ -61,6 +64,7 @@ func parseYAML(raw string) (Config, error) {
 				inCustomIcons = false
 				inFavicon = false
 				inAssetUpload = false
+				inTracking = false
 				continue
 			}
 			if key == "favicon" {
@@ -69,6 +73,7 @@ func parseYAML(raw string) (Config, error) {
 				inCustomIcons = false
 				inStaticAssets = false
 				inAssetUpload = false
+				inTracking = false
 				continue
 			}
 			if key == "asset_upload" {
@@ -77,6 +82,16 @@ func parseYAML(raw string) (Config, error) {
 				inCustomIcons = false
 				inStaticAssets = false
 				inFavicon = false
+				inTracking = false
+				continue
+			}
+			if key == "tracking" {
+				inTracking = true
+				inLinks = false
+				inCustomIcons = false
+				inStaticAssets = false
+				inFavicon = false
+				inAssetUpload = false
 				continue
 			}
 			inLinks = false
@@ -84,6 +99,7 @@ func parseYAML(raw string) (Config, error) {
 			inStaticAssets = false
 			inFavicon = false
 			inAssetUpload = false
+			inTracking = false
 			if err := setConfigScalar(&cfg, key, value); err != nil {
 				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
 			}
@@ -107,6 +123,17 @@ func parseYAML(raw string) (Config, error) {
 				return Config{}, fmt.Errorf("line %d: expected key: value", lineNo)
 			}
 			if err := setAssetUploadScalar(&cfg.AssetUpload, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
+				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
+			}
+			continue
+		}
+
+		if inTracking {
+			key, value, ok := strings.Cut(trimmed, ":")
+			if !ok {
+				return Config{}, fmt.Errorf("line %d: expected key: value", lineNo)
+			}
+			if err := setTrackingScalar(&cfg.Tracking, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
 				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
 			}
 			continue
@@ -173,7 +200,7 @@ func parseYAML(raw string) (Config, error) {
 		}
 
 		if !inLinks {
-			return Config{}, fmt.Errorf("line %d: nested values are only supported under favicon, asset_upload, static_assets, custom_icons, or links", lineNo)
+			return Config{}, fmt.Errorf("line %d: nested values are only supported under favicon, asset_upload, tracking, static_assets, custom_icons, or links", lineNo)
 		}
 		if strings.HasPrefix(trimmed, "- ") {
 			parent := currentParent(stack, indent)
@@ -315,6 +342,16 @@ func setAssetUploadScalar(upload *AssetUpload, key string, value string) error {
 		upload.Prefix = unquote(value)
 	default:
 		return fmt.Errorf("unknown asset_upload key %q", key)
+	}
+	return nil
+}
+
+func setTrackingScalar(tracking *Tracking, key string, value string) error {
+	switch key {
+	case "google_ads_id":
+		tracking.GoogleAdsID = unquote(value)
+	default:
+		return fmt.Errorf("unknown tracking key %q", key)
 	}
 	return nil
 }

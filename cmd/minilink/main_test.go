@@ -15,7 +15,7 @@ func TestWriteHTMLCacheValidation(t *testing.T) {
 	etag := strongETag(body)
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	writeHTML(rec, req, body, etag, time.Unix(10, 0).UTC(), 300, false)
+	writeHTML(rec, req, body, etag, time.Unix(10, 0).UTC(), 300, false, false)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("code = %d", rec.Code)
 	}
@@ -32,7 +32,7 @@ func TestWriteHTMLCacheValidation(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("If-None-Match", etag)
 	rec = httptest.NewRecorder()
-	writeHTML(rec, req, body, etag, time.Unix(10, 0).UTC(), 300, false)
+	writeHTML(rec, req, body, etag, time.Unix(10, 0).UTC(), 300, false, false)
 	if rec.Code != http.StatusNotModified {
 		t.Fatalf("code = %d", rec.Code)
 	}
@@ -42,16 +42,29 @@ func TestWriteHTMLCacheValidation(t *testing.T) {
 }
 
 func TestContentSecurityPolicyExternalImages(t *testing.T) {
-	strict := contentSecurityPolicy(false)
+	strict := contentSecurityPolicy(false, false)
 	if !strings.Contains(strict, "img-src 'self' data:") {
 		t.Fatalf("strict csp should allow local generated images: %s", strict)
 	}
 	if strings.Contains(strict, "https:") {
 		t.Fatalf("strict csp should not allow remote images: %s", strict)
 	}
-	withImages := contentSecurityPolicy(true)
+	withImages := contentSecurityPolicy(true, false)
 	if !strings.Contains(withImages, "img-src 'self' https: data:") {
 		t.Fatalf("external icon csp missing img-src: %s", withImages)
+	}
+}
+
+func TestContentSecurityPolicyTracking(t *testing.T) {
+	withTracking := contentSecurityPolicy(false, true)
+	if !strings.Contains(withTracking, "https://www.googletagmanager.com") {
+		t.Fatalf("tracking csp missing tag manager: %s", withTracking)
+	}
+	if !strings.Contains(withTracking, "https://www.google-analytics.com") {
+		t.Fatalf("tracking csp missing analytics endpoint: %s", withTracking)
+	}
+	if !strings.Contains(withTracking, "script-src 'unsafe-inline' https://www.googletagmanager.com") {
+		t.Fatalf("tracking csp missing script source: %s", withTracking)
 	}
 }
 

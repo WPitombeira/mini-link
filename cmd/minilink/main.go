@@ -92,6 +92,7 @@ func serve(args []string) error {
 	etag := strongETag(page)
 	started := time.Now().UTC()
 	allowExternalImages := config.HasExternalMedia(cfg)
+	allowTracking := config.HasTracking(cfg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -99,25 +100,25 @@ func serve(args []string) error {
 			http.NotFound(w, r)
 			return
 		}
-		writeHTML(w, r, page, etag, started, cfg.CacheSeconds, allowExternalImages)
+		writeHTML(w, r, page, etag, started, cfg.CacheSeconds, allowExternalImages, allowTracking)
 	})
 	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
-		writeText(w, []byte(robotsTXT(cfg)), "text/plain; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
+		writeText(w, []byte(robotsTXT(cfg)), "text/plain; charset=utf-8", cfg.CacheSeconds, allowExternalImages, allowTracking)
 	})
 	mux.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
-		writeText(w, []byte(sitemapXML(cfg, started)), "application/xml; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
+		writeText(w, []byte(sitemapXML(cfg, started)), "application/xml; charset=utf-8", cfg.CacheSeconds, allowExternalImages, allowTracking)
 	})
 	mux.HandleFunc("/llms.txt", func(w http.ResponseWriter, r *http.Request) {
-		writeText(w, []byte(llmsTXT(cfg)), "text/markdown; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
+		writeText(w, []byte(llmsTXT(cfg)), "text/markdown; charset=utf-8", cfg.CacheSeconds, allowExternalImages, allowTracking)
 	})
 	for _, asset := range servedAssetFiles {
 		asset := asset
 		mux.HandleFunc("/"+asset.Name, func(w http.ResponseWriter, r *http.Request) {
-			writeText(w, asset.Body, asset.ContentType, cfg.CacheSeconds, allowExternalImages)
+			writeText(w, asset.Body, asset.ContentType, cfg.CacheSeconds, allowExternalImages, allowTracking)
 		})
 	}
 	mux.HandleFunc("/site.webmanifest", func(w http.ResponseWriter, r *http.Request) {
-		writeText(w, []byte(siteManifest(cfg, serveAssets.Favicons)), "application/manifest+json; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
+		writeText(w, []byte(siteManifest(cfg, serveAssets.Favicons)), "application/manifest+json; charset=utf-8", cfg.CacheSeconds, allowExternalImages, allowTracking)
 	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -185,10 +186,11 @@ func export(args []string) error {
 		return err
 	}
 	allowExternalImages := config.HasExternalMedia(cfg) || cfg.AssetUpload.Provider != ""
-	if err := os.WriteFile(filepath.Join(*out, "_headers"), []byte(headersFile(cfg.CacheSeconds, allowExternalImages)), 0o644); err != nil {
+	allowTracking := config.HasTracking(cfg)
+	if err := os.WriteFile(filepath.Join(*out, "_headers"), []byte(headersFile(cfg.CacheSeconds, allowExternalImages, allowTracking)), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(*out, "vercel.json"), []byte(vercelConfig(cfg.CacheSeconds, allowExternalImages)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(*out, "vercel.json"), []byte(vercelConfig(cfg.CacheSeconds, allowExternalImages, allowTracking)), 0o644); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(*out, "robots.txt"), []byte(robotsTXT(cfg)), 0o644); err != nil {
@@ -241,11 +243,11 @@ func validate(args []string) error {
 	return nil
 }
 
-func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string, modified time.Time, ttl int, allowExternalImages bool) {
+func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string, modified time.Time, ttl int, allowExternalImages bool, allowTracking bool) {
 	w.Header().Set("Cache-Control", cacheControl(ttl))
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Last-Modified", modified.Format(http.TimeFormat))
-	securityHeaders(w.Header(), allowExternalImages)
+	securityHeaders(w.Header(), allowExternalImages, allowTracking)
 	if match := r.Header.Get("If-None-Match"); match == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -262,10 +264,10 @@ func writeHTML(w http.ResponseWriter, r *http.Request, page []byte, etag string,
 	_, _ = w.Write(page)
 }
 
-func writeText(w http.ResponseWriter, body []byte, contentType string, ttl int, allowExternalImages bool) {
+func writeText(w http.ResponseWriter, body []byte, contentType string, ttl int, allowExternalImages bool, allowTracking bool) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Cache-Control", cacheControl(ttl))
-	securityHeaders(w.Header(), allowExternalImages)
+	securityHeaders(w.Header(), allowExternalImages, allowTracking)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
@@ -282,16 +284,16 @@ func cacheControl(ttl int) string {
 	return fmt.Sprintf("public, max-age=%d, s-maxage=%d, stale-while-revalidate=604800", ttl, ttl*288)
 }
 
-func headersFile(ttl int, allowExternalImages bool) string {
+func headersFile(ttl int, allowExternalImages bool, allowTracking bool) string {
 	return "/*\n" +
 		"  Cache-Control: " + cacheControl(ttl) + "\n" +
-		"  Content-Security-Policy: " + contentSecurityPolicy(allowExternalImages) + "\n" +
+		"  Content-Security-Policy: " + contentSecurityPolicy(allowExternalImages, allowTracking) + "\n" +
 		"  X-Content-Type-Options: nosniff\n" +
 		"  Referrer-Policy: strict-origin-when-cross-origin\n" +
 		"  Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()\n"
 }
 
-func vercelConfig(ttl int, allowExternalImages bool) string {
+func vercelConfig(ttl int, allowExternalImages bool, allowTracking bool) string {
 	return fmt.Sprintf(`{
   "headers": [
     {
@@ -306,19 +308,24 @@ func vercelConfig(ttl int, allowExternalImages bool) string {
     }
   ]
 }
-`, cacheControl(ttl), contentSecurityPolicy(allowExternalImages))
+`, cacheControl(ttl), contentSecurityPolicy(allowExternalImages, allowTracking))
 }
 
-func securityHeaders(header http.Header, allowExternalImages bool) {
-	header.Set("Content-Security-Policy", contentSecurityPolicy(allowExternalImages))
+func securityHeaders(header http.Header, allowExternalImages bool, allowTracking bool) {
+	header.Set("Content-Security-Policy", contentSecurityPolicy(allowExternalImages, allowTracking))
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 	header.Set("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()")
 }
 
-func contentSecurityPolicy(allowExternalImages bool) string {
+func contentSecurityPolicy(allowExternalImages bool, allowTracking bool) string {
 	policy := "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'none'; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 	if allowExternalImages {
+		policy = strings.Replace(policy, "img-src 'self' data:", "img-src 'self' https: data:", 1)
+	}
+	if allowTracking {
+		policy = strings.Replace(policy, "script-src 'none';", "script-src 'unsafe-inline' https://www.googletagmanager.com;", 1)
+		policy = strings.Replace(policy, "connect-src 'self';", "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com;", 1)
 		policy = strings.Replace(policy, "img-src 'self' data:", "img-src 'self' https: data:", 1)
 	}
 	return policy

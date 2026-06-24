@@ -68,6 +68,23 @@ func TestPageRendersDropdowns(t *testing.T) {
 	}
 }
 
+func TestPageRendersGoogleAdsTrackingWhenConfigured(t *testing.T) {
+	cfg := config.Default()
+	cfg.Tracking.GoogleAdsID = "AW-123456789"
+	cfg.Links = []config.Link{{Title: "Website", URL: "https://example.com", Icon: "globe"}}
+	page, err := Page(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := string(page)
+	if !strings.Contains(html, "https://www.googletagmanager.com/gtag/js?id=AW-123456789") {
+		t.Fatal("missing google tag script")
+	}
+	if !strings.Contains(html, `gtag("config","AW-123456789")`) {
+		t.Fatal("missing google ads config")
+	}
+}
+
 func TestPageRendersCustomAndExternalIcons(t *testing.T) {
 	cfg := config.Default()
 	cfg.CustomIcons = []config.CustomIcon{

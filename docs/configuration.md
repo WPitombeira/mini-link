@@ -18,6 +18,7 @@ Common fields:
 - `asset_upload`
 - `static_assets`
 - `custom_icons`
+- `tracking`
 - `links`
 
 ## JSON
@@ -92,6 +93,12 @@ MINI_LINK_ASSET_UPLOAD_ACCESS_KEY_ID=...
 MINI_LINK_ASSET_UPLOAD_SECRET_ACCESS_KEY=...
 MINI_LINK_ASSET_UPLOAD_PUBLIC_BASE_URL=https://assets.example.com
 MINI_LINK_ASSET_UPLOAD_PREFIX=profiles/wp
+```
+
+Optional Google Ads tracking can be enabled with:
+
+```text
+MINI_LINK_GOOGLE_ADS_ID=AW-123456789
 ```
 
 ## Dropdowns
@@ -220,3 +227,14 @@ asset_upload:
 YAML values are literal; Mini-Link does not expand `${...}` placeholders. For secret-backed upload config, prefer `.env` files or CI-provided environment variables.
 
 For Cloudflare Workers Static Assets and Pages, the default recommendation is not to upload favicons to R2. Let Mini-Link write them into `dist/` and let Cloudflare serve/cache them as regular static assets. Use R2/S3 when you need assets shared across multiple deployments, runtime user uploads, or a long-lived bucket independent from the Mini-Link build artifact.
+
+## Tracking
+
+Mini-Link ships with no JavaScript by default. If you need Google Ads conversion or remarketing tracking, configure your Google Ads tag ID:
+
+```yaml
+tracking:
+  google_ads_id: AW-123456789
+```
+
+When this value is set, Mini-Link adds the Google tag script and updates the Content Security Policy for `www.googletagmanager.com` and `www.google-analytics.com`. Leave it unset when you want the fastest no-JavaScript page.

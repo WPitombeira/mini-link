@@ -29,6 +29,7 @@ type Config struct {
 	CacheSeconds int           `json:"cache_seconds"`
 	Favicon      Favicon       `json:"favicon,omitempty"`
 	AssetUpload  AssetUpload   `json:"asset_upload,omitempty"`
+	Tracking     Tracking      `json:"tracking,omitempty"`
 	StaticAssets []StaticAsset `json:"static_assets,omitempty"`
 	CustomIcons  []CustomIcon  `json:"custom_icons,omitempty"`
 	Links        []Link        `json:"links"`
@@ -48,6 +49,10 @@ type AssetUpload struct {
 	SecretAccessKey string `json:"secret_access_key"`
 	PublicBaseURL   string `json:"public_base_url"`
 	Prefix          string `json:"prefix"`
+}
+
+type Tracking struct {
+	GoogleAdsID string `json:"google_ads_id"`
 }
 
 type StaticAsset struct {
@@ -154,6 +159,7 @@ func normalize(cfg Config) (Config, error) {
 	cfg.AssetUpload.SecretAccessKey = strings.TrimSpace(cfg.AssetUpload.SecretAccessKey)
 	cfg.AssetUpload.PublicBaseURL = strings.TrimRight(strings.TrimSpace(cfg.AssetUpload.PublicBaseURL), "/")
 	cfg.AssetUpload.Prefix = strings.Trim(strings.TrimSpace(cfg.AssetUpload.Prefix), "/")
+	cfg.Tracking.GoogleAdsID = strings.TrimSpace(cfg.Tracking.GoogleAdsID)
 	if cfg.Name == "" {
 		return Config{}, errors.New("name is required")
 	}
@@ -185,6 +191,9 @@ func normalize(cfg Config) (Config, error) {
 		return Config{}, err
 	}
 	if err := normalizeAssetUpload(&cfg); err != nil {
+		return Config{}, err
+	}
+	if err := normalizeTracking(&cfg); err != nil {
 		return Config{}, err
 	}
 	staticAssets, err := normalizeStaticAssets(cfg.StaticAssets)
@@ -272,6 +281,16 @@ func normalizeAssetUpload(cfg *Config) error {
 	}
 	if err := validateAbsoluteHTTPURL(cfg.AssetUpload.PublicBaseURL); err != nil {
 		return fmt.Errorf("asset_upload.public_base_url: %w", err)
+	}
+	return nil
+}
+
+func normalizeTracking(cfg *Config) error {
+	if cfg.Tracking.GoogleAdsID == "" {
+		return nil
+	}
+	if strings.ContainsAny(cfg.Tracking.GoogleAdsID, ` "'<>`) {
+		return errors.New("tracking.google_ads_id contains unsafe characters")
 	}
 	return nil
 }
@@ -597,6 +616,9 @@ func merge(base Config, next Config) Config {
 	if next.AssetUpload != (AssetUpload{}) {
 		base.AssetUpload = next.AssetUpload
 	}
+	if next.Tracking != (Tracking{}) {
+		base.Tracking = next.Tracking
+	}
 	if next.StaticAssets != nil {
 		base.StaticAssets = next.StaticAssets
 	}
@@ -639,6 +661,7 @@ func loadEnv(base Config, entries []string) (Config, error) {
 	cfg.AssetUpload.SecretAccessKey = first(values, "MINI_LINK_ASSET_UPLOAD_SECRET_ACCESS_KEY", cfg.AssetUpload.SecretAccessKey)
 	cfg.AssetUpload.PublicBaseURL = first(values, "MINI_LINK_ASSET_UPLOAD_PUBLIC_BASE_URL", cfg.AssetUpload.PublicBaseURL)
 	cfg.AssetUpload.Prefix = first(values, "MINI_LINK_ASSET_UPLOAD_PREFIX", cfg.AssetUpload.Prefix)
+	cfg.Tracking.GoogleAdsID = first(values, "MINI_LINK_GOOGLE_ADS_ID", cfg.Tracking.GoogleAdsID)
 	if raw := values["MINI_LINK_CACHE_SECONDS"]; raw != "" {
 		ttl, err := strconv.Atoi(raw)
 		if err != nil {
@@ -719,6 +742,10 @@ func HasExternalMedia(cfg Config) bool {
 		return true
 	}
 	return HasExternalIcons(cfg)
+}
+
+func HasTracking(cfg Config) bool {
+	return cfg.Tracking.GoogleAdsID != ""
 }
 
 func linksHaveExternalIcons(links []Link) bool {

@@ -11,10 +11,13 @@ func parseYAML(raw string) (Config, error) {
 	var cfg Config
 	var customIcons []CustomIcon
 	var currentIcon *CustomIcon
+	var staticAssets []StaticAsset
+	var currentAsset *StaticAsset
 	var links []Link
 	var stack []linkFrame
 	inLinks := false
 	inCustomIcons := false
+	inStaticAssets := false
 	inFavicon := false
 	inAssetUpload := false
 
@@ -39,6 +42,7 @@ func parseYAML(raw string) (Config, error) {
 			if key == "links" {
 				inLinks = true
 				inCustomIcons = false
+				inStaticAssets = false
 				inFavicon = false
 				inAssetUpload = false
 				continue
@@ -46,6 +50,15 @@ func parseYAML(raw string) (Config, error) {
 			if key == "custom_icons" {
 				inCustomIcons = true
 				inLinks = false
+				inStaticAssets = false
+				inFavicon = false
+				inAssetUpload = false
+				continue
+			}
+			if key == "static_assets" {
+				inStaticAssets = true
+				inLinks = false
+				inCustomIcons = false
 				inFavicon = false
 				inAssetUpload = false
 				continue
@@ -54,6 +67,7 @@ func parseYAML(raw string) (Config, error) {
 				inFavicon = true
 				inLinks = false
 				inCustomIcons = false
+				inStaticAssets = false
 				inAssetUpload = false
 				continue
 			}
@@ -61,11 +75,13 @@ func parseYAML(raw string) (Config, error) {
 				inAssetUpload = true
 				inLinks = false
 				inCustomIcons = false
+				inStaticAssets = false
 				inFavicon = false
 				continue
 			}
 			inLinks = false
 			inCustomIcons = false
+			inStaticAssets = false
 			inFavicon = false
 			inAssetUpload = false
 			if err := setConfigScalar(&cfg, key, value); err != nil {
@@ -126,8 +142,38 @@ func parseYAML(raw string) (Config, error) {
 			continue
 		}
 
+		if inStaticAssets {
+			if strings.HasPrefix(trimmed, "- ") {
+				staticAssets = append(staticAssets, StaticAsset{})
+				currentAsset = &staticAssets[len(staticAssets)-1]
+				rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "- "))
+				if rest == "" {
+					continue
+				}
+				key, value, ok := strings.Cut(rest, ":")
+				if !ok {
+					return Config{}, fmt.Errorf("line %d: expected - key: value", lineNo)
+				}
+				if err := setStaticAssetScalar(currentAsset, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
+					return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
+				}
+				continue
+			}
+			if currentAsset == nil {
+				return Config{}, fmt.Errorf("line %d: static asset item must start with -", lineNo)
+			}
+			key, value, ok := strings.Cut(trimmed, ":")
+			if !ok {
+				return Config{}, fmt.Errorf("line %d: expected key: value", lineNo)
+			}
+			if err := setStaticAssetScalar(currentAsset, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
+				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
+			}
+			continue
+		}
+
 		if !inLinks {
-			return Config{}, fmt.Errorf("line %d: nested values are only supported under favicon, asset_upload, custom_icons, or links", lineNo)
+			return Config{}, fmt.Errorf("line %d: nested values are only supported under favicon, asset_upload, static_assets, custom_icons, or links", lineNo)
 		}
 		if strings.HasPrefix(trimmed, "- ") {
 			parent := currentParent(stack, indent)
@@ -177,6 +223,9 @@ func parseYAML(raw string) (Config, error) {
 	}
 	if customIcons != nil {
 		cfg.CustomIcons = customIcons
+	}
+	if staticAssets != nil {
+		cfg.StaticAssets = staticAssets
 	}
 	return cfg, nil
 }
@@ -270,6 +319,20 @@ func setAssetUploadScalar(upload *AssetUpload, key string, value string) error {
 	return nil
 }
 
+func setStaticAssetScalar(asset *StaticAsset, key string, value string) error {
+	switch key {
+	case "source_path":
+		asset.SourcePath = unquote(value)
+	case "output_path":
+		asset.OutputPath = unquote(value)
+	case "content_type":
+		asset.ContentType = unquote(value)
+	default:
+		return fmt.Errorf("unknown static_assets key %q", key)
+	}
+	return nil
+}
+
 func setLinkScalar(link *Link, key string, value string) error {
 	switch key {
 	case "title":
@@ -280,6 +343,8 @@ func setLinkScalar(link *Link, key string, value string) error {
 		link.Icon = unquote(value)
 	case "icon_url":
 		link.IconURL = unquote(value)
+	case "color":
+		link.Color = unquote(value)
 	case "rel":
 		link.Rel = unquote(value)
 	case "featured":

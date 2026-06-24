@@ -17,20 +17,21 @@ import (
 )
 
 type Config struct {
-	Name         string       `json:"name"`
-	Title        string       `json:"title"`
-	Bio          string       `json:"bio"`
-	Avatar       string       `json:"avatar"`
-	AvatarURL    string       `json:"avatar_url"`
-	BaseURL      string       `json:"base_url"`
-	Template     string       `json:"template"`
-	Accent       string       `json:"accent"`
-	Footer       string       `json:"footer"`
-	CacheSeconds int          `json:"cache_seconds"`
-	Favicon      Favicon      `json:"favicon,omitempty"`
-	AssetUpload  AssetUpload  `json:"asset_upload,omitempty"`
-	CustomIcons  []CustomIcon `json:"custom_icons,omitempty"`
-	Links        []Link       `json:"links"`
+	Name         string        `json:"name"`
+	Title        string        `json:"title"`
+	Bio          string        `json:"bio"`
+	Avatar       string        `json:"avatar"`
+	AvatarURL    string        `json:"avatar_url"`
+	BaseURL      string        `json:"base_url"`
+	Template     string        `json:"template"`
+	Accent       string        `json:"accent"`
+	Footer       string        `json:"footer"`
+	CacheSeconds int           `json:"cache_seconds"`
+	Favicon      Favicon       `json:"favicon,omitempty"`
+	AssetUpload  AssetUpload   `json:"asset_upload,omitempty"`
+	StaticAssets []StaticAsset `json:"static_assets,omitempty"`
+	CustomIcons  []CustomIcon  `json:"custom_icons,omitempty"`
+	Links        []Link        `json:"links"`
 }
 
 type Favicon struct {
@@ -49,11 +50,18 @@ type AssetUpload struct {
 	Prefix          string `json:"prefix"`
 }
 
+type StaticAsset struct {
+	SourcePath  string `json:"source_path"`
+	OutputPath  string `json:"output_path"`
+	ContentType string `json:"content_type"`
+}
+
 type Link struct {
 	Title    string `json:"title"`
 	URL      string `json:"url"`
 	Icon     string `json:"icon"`
 	IconURL  string `json:"icon_url"`
+	Color    string `json:"color"`
 	Featured bool   `json:"featured"`
 	Open     bool   `json:"open"`
 	Rel      string `json:"rel"`
@@ -169,7 +177,7 @@ func normalize(cfg Config) (Config, error) {
 		}
 	}
 	if cfg.AvatarURL != "" {
-		if err := validateAbsoluteHTTPURL(cfg.AvatarURL); err != nil {
+		if err := validateImageURL(cfg.AvatarURL); err != nil {
 			return Config{}, fmt.Errorf("avatar_url: %w", err)
 		}
 	}
@@ -179,6 +187,11 @@ func normalize(cfg Config) (Config, error) {
 	if err := normalizeAssetUpload(&cfg); err != nil {
 		return Config{}, err
 	}
+	staticAssets, err := normalizeStaticAssets(cfg.StaticAssets)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.StaticAssets = staticAssets
 	if cfg.Accent == "" {
 		cfg.Accent = "#0f766e"
 	}
@@ -263,6 +276,35 @@ func normalizeAssetUpload(cfg *Config) error {
 	return nil
 }
 
+func normalizeStaticAssets(input []StaticAsset) ([]StaticAsset, error) {
+	if len(input) == 0 {
+		return nil, nil
+	}
+	seen := map[string]bool{}
+	out := make([]StaticAsset, 0, len(input))
+	for i, asset := range input {
+		where := fmt.Sprintf("static_assets[%d]", i)
+		asset.SourcePath = strings.TrimSpace(asset.SourcePath)
+		asset.OutputPath = strings.Trim(strings.TrimSpace(asset.OutputPath), "/")
+		asset.ContentType = strings.TrimSpace(asset.ContentType)
+		if asset.SourcePath == "" {
+			return nil, fmt.Errorf("%s.source_path is required", where)
+		}
+		if asset.OutputPath == "" {
+			return nil, fmt.Errorf("%s.output_path is required", where)
+		}
+		if filepath.IsAbs(asset.OutputPath) || strings.Contains(asset.OutputPath, "..") {
+			return nil, fmt.Errorf("%s.output_path must be a relative path without ..", where)
+		}
+		if seen[asset.OutputPath] {
+			return nil, fmt.Errorf("%s.output_path %q is duplicated", where, asset.OutputPath)
+		}
+		seen[asset.OutputPath] = true
+		out = append(out, asset)
+	}
+	return out, nil
+}
+
 func normalizeCustomIcons(input []CustomIcon) ([]CustomIcon, error) {
 	if len(input) == 0 {
 		return nil, nil
@@ -315,7 +357,7 @@ func normalizeCustomIcons(input []CustomIcon) ([]CustomIcon, error) {
 		}
 		if icon.URL != "" {
 			forms++
-			if err := validateAbsoluteHTTPURL(icon.URL); err != nil {
+			if err := validateImageURL(icon.URL); err != nil {
 				return nil, fmt.Errorf("%s.url: %w", where, err)
 			}
 		}
@@ -340,9 +382,13 @@ func normalizeLink(link *Link, path string, depth int, customIconNames map[strin
 		link.Icon = ""
 	}
 	link.Icon = strings.ToLower(link.Icon)
+	link.Color = strings.TrimSpace(link.Color)
 	link.Rel = strings.TrimSpace(link.Rel)
 	if link.Title == "" {
 		return fmt.Errorf("%s.title is required", path)
+	}
+	if link.Color != "" && !colorPattern.MatchString(link.Color) {
+		return fmt.Errorf("%s.color must be a hex color like #0f766e", path)
 	}
 	if len(link.Links) > 0 {
 		if link.URL != "" {
@@ -352,7 +398,7 @@ func normalizeLink(link *Link, path string, depth int, customIconNames map[strin
 			link.Icon = "link"
 		}
 		if link.IconURL != "" {
-			if err := validateAbsoluteHTTPURL(link.IconURL); err != nil {
+			if err := validateImageURL(link.IconURL); err != nil {
 				return fmt.Errorf("%s.icon_url: %w", path, err)
 			}
 		} else if !iconExists(link.Icon, customIconNames) {
@@ -375,7 +421,7 @@ func normalizeLink(link *Link, path string, depth int, customIconNames map[strin
 		link.Icon = "link"
 	}
 	if link.IconURL != "" {
-		if err := validateAbsoluteHTTPURL(link.IconURL); err != nil {
+		if err := validateImageURL(link.IconURL); err != nil {
 			return fmt.Errorf("%s.icon_url: %w", path, err)
 		}
 	} else if !iconExists(link.Icon, customIconNames) {
@@ -503,6 +549,13 @@ func validateAbsoluteHTTPURL(raw string) error {
 	return nil
 }
 
+func validateImageURL(raw string) error {
+	if strings.HasPrefix(raw, "/") && !strings.HasPrefix(raw, "//") {
+		return nil
+	}
+	return validateAbsoluteHTTPURL(raw)
+}
+
 func isHTTPURL(raw string) bool {
 	return strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://")
 }
@@ -543,6 +596,9 @@ func merge(base Config, next Config) Config {
 	}
 	if next.AssetUpload != (AssetUpload{}) {
 		base.AssetUpload = next.AssetUpload
+	}
+	if next.StaticAssets != nil {
+		base.StaticAssets = next.StaticAssets
 	}
 	if next.CustomIcons != nil {
 		base.CustomIcons = next.CustomIcons
@@ -625,6 +681,7 @@ func numberedLinks(values map[string]string) []Link {
 			URL:      url,
 			Icon:     first(values, prefix+"ICON", ""),
 			IconURL:  first(values, prefix+"ICON_URL", ""),
+			Color:    first(values, prefix+"COLOR", ""),
 			Rel:      values[prefix+"REL"],
 			Featured: featured,
 			Open:     open,
@@ -647,7 +704,7 @@ func CountLinks(links []Link) int {
 
 func HasExternalIcons(cfg Config) bool {
 	for _, icon := range cfg.CustomIcons {
-		if icon.URL != "" {
+		if isHTTPURL(icon.URL) {
 			return true
 		}
 	}
@@ -655,10 +712,10 @@ func HasExternalIcons(cfg Config) bool {
 }
 
 func HasExternalMedia(cfg Config) bool {
-	if cfg.AvatarURL != "" {
+	if isHTTPURL(cfg.AvatarURL) {
 		return true
 	}
-	if cfg.Favicon.SourceURL != "" {
+	if isHTTPURL(cfg.Favicon.SourceURL) {
 		return true
 	}
 	return HasExternalIcons(cfg)
@@ -666,7 +723,7 @@ func HasExternalMedia(cfg Config) bool {
 
 func linksHaveExternalIcons(links []Link) bool {
 	for _, link := range links {
-		if link.IconURL != "" || isHTTPURL(link.Icon) {
+		if isHTTPURL(link.IconURL) || isHTTPURL(link.Icon) {
 			return true
 		}
 		if linksHaveExternalIcons(link.Links) {

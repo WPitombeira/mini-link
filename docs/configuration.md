@@ -16,6 +16,7 @@ Common fields:
 - `cache_seconds`
 - `favicon`
 - `asset_upload`
+- `static_assets`
 - `custom_icons`
 - `links`
 
@@ -41,7 +42,7 @@ Mini-Link does not depend on a YAML package, so YAML support intentionally cover
 - strings, booleans, and integer `cache_seconds`
 - comments with `#` outside quoted strings
 
-Advanced YAML features such as anchors, multi-line strings, nested objects outside link groups, and custom tags are not supported.
+Advanced YAML features such as anchors, multi-line strings, arbitrary nested objects, and custom tags are not supported.
 
 ## Env
 
@@ -65,6 +66,8 @@ Link variables use numbered groups:
 MINI_LINK_LINK_1_TITLE
 MINI_LINK_LINK_1_URL
 MINI_LINK_LINK_1_ICON
+MINI_LINK_LINK_1_ICON_URL
+MINI_LINK_LINK_1_COLOR
 MINI_LINK_LINK_1_FEATURED
 MINI_LINK_LINK_1_REL
 ```
@@ -112,7 +115,7 @@ links:
 Dropdown rules:
 
 - dropdown groups use `title`, optional `icon`, optional `featured`, optional `open`, and nested `links`
-- direct links use `title`, `url`, optional `icon`, optional `featured`, and optional `rel`
+- direct links use `title`, `url`, optional `icon`, optional `icon_url`, optional `color`, optional `featured`, and optional `rel`
 - a single item cannot define both `url` and nested `links`
 - nesting is limited to three levels to keep the page readable
 
@@ -147,9 +150,27 @@ links:
   - title: CDN icon
     url: https://example.com
     icon_url: https://cdn.example.com/icon.svg
+    color: "#2563eb"
 ```
 
 External icon URLs add browser requests and require a looser `img-src` Content Security Policy. They are supported for flexibility, but built-in icons and inline custom icons preserve Mini-Link's fastest one-request behavior.
+
+Root-relative image URLs are also supported when paired with `static_assets`:
+
+```yaml
+avatar_url: /assets/avatar.png
+static_assets:
+  - source_path: local/profile/avatar.png
+    output_path: assets/avatar.png
+    content_type: image/png
+links:
+  - title: Local icon
+    url: https://example.com
+    icon_url: /assets/icon.png
+    color: "#ef4444"
+```
+
+During `serve`, Mini-Link reads `static_assets` from disk and serves each asset at `/<output_path>`. During `export`, those files are copied into the output directory. Keep personal/local assets in an ignored folder such as `local/`.
 
 ## Favicon
 
@@ -190,10 +211,12 @@ asset_upload:
   provider: r2
   endpoint: https://account-id.r2.cloudflarestorage.com
   bucket: mini-link
-  access_key_id: ${MINI_LINK_ASSET_UPLOAD_ACCESS_KEY_ID}
-  secret_access_key: ${MINI_LINK_ASSET_UPLOAD_SECRET_ACCESS_KEY}
+  access_key_id: <MINI_LINK_ASSET_UPLOAD_ACCESS_KEY_ID>
+  secret_access_key: <MINI_LINK_ASSET_UPLOAD_SECRET_ACCESS_KEY>
   public_base_url: https://assets.example.com
   prefix: profiles/wp
 ```
+
+YAML values are literal; Mini-Link does not expand `${...}` placeholders. For secret-backed upload config, prefer `.env` files or CI-provided environment variables.
 
 For Cloudflare Workers Static Assets and Pages, the default recommendation is not to upload favicons to R2. Let Mini-Link write them into `dist/` and let Cloudflare serve/cache them as regular static assets. Use R2/S3 when you need assets shared across multiple deployments, runtime user uploads, or a long-lived bucket independent from the Mini-Link build artifact.

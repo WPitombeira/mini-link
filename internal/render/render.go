@@ -40,6 +40,7 @@ type linkData struct {
 	IconURL  string
 	Host     string
 	New      bool
+	Style    template.CSS
 	Children []linkData
 }
 
@@ -87,10 +88,18 @@ func buildLinks(links []config.Link, customIcons map[string]customIcon) []linkDa
 			IconURL:  iconURL,
 			Host:     host(link.URL),
 			New:      opensNewTab(link.URL),
+			Style:    linkStyle(link),
 			Children: buildLinks(link.Links, customIcons),
 		})
 	}
 	return out
+}
+
+func linkStyle(link config.Link) template.CSS {
+	if link.Color == "" {
+		return ""
+	}
+	return template.CSS("--link-color:" + link.Color)
 }
 
 type customIcon struct {
@@ -216,7 +225,7 @@ var pageTemplate = template.Must(template.New("page").Parse(`{{define "linkItem"
 <div class="dropdown-links">
 {{range .Children}}{{template "linkItem" .}}{{end}}</div>
 </details>
-{{else}}<a class="link{{if .Featured}} featured{{end}}" href="{{.URL}}" rel="{{.Rel}}"{{if .New}} target="_blank"{{end}}>
+{{else}}<a class="link{{if .Featured}} featured{{end}}" href="{{.URL}}" rel="{{.Rel}}"{{if .New}} target="_blank"{{end}}{{if .Style}} style="{{.Style}}"{{end}}>
 <span class="icon">{{if .IconURL}}<img src="{{.IconURL}}" alt="" loading="lazy" decoding="async">{{else}}{{.Icon}}{{end}}</span>
 <span class="label"><span class="title">{{.Title}}</span><span class="host">{{.Host}}</span></span>
 <span class="arrow" aria-hidden="true">›</span>
@@ -267,13 +276,13 @@ h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing
 .theme-terminal h1{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#d8ffe8}
 .bio{margin:0;color:var(--muted);font-size:15px}
 .links{display:grid;gap:10px}
-.link,.dropdown summary{min-height:56px;display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:14px;padding:13px 15px;border:1px solid var(--text);border-radius:10px;color:var(--text);text-decoration:none;background:#fff;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.link,.dropdown summary{min-height:56px;display:grid;grid-template-columns:24px 1fr 24px;align-items:center;gap:14px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--link-color,var(--text)) 58%,var(--text));border-radius:10px;color:var(--link-color,var(--text));text-decoration:none;background:#fff;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
 .dropdown summary{cursor:pointer;list-style:none}
 .dropdown summary::-webkit-details-marker{display:none}
-.link:hover,.dropdown summary:hover{border-color:var(--accent);box-shadow:0 10px 24px rgba(17,24,39,.08);transform:translateY(-1px)}
-.link:focus-visible,.dropdown summary:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 32%,transparent);outline-offset:3px}
-.link.featured{min-height:76px;border-color:var(--accent);color:#166534;background:#fbfffd}
-.dropdown.featured summary{min-height:76px;border-color:var(--accent);color:#166534;background:#fbfffd}
+.link:hover,.dropdown summary:hover{border-color:var(--link-color,var(--accent));box-shadow:0 10px 24px rgba(17,24,39,.08);transform:translateY(-1px)}
+.link:focus-visible,.dropdown summary:focus-visible{outline:3px solid color-mix(in srgb,var(--link-color,var(--accent)) 32%,transparent);outline-offset:3px}
+.link.featured{min-height:76px;border-color:var(--link-color,var(--accent));color:var(--link-color,#166534);background:#fbfffd}
+.dropdown.featured summary{min-height:76px;border-color:var(--link-color,var(--accent));color:var(--link-color,#166534);background:#fbfffd}
 .theme-glass .link,.theme-glass .dropdown summary{border-color:rgba(255,255,255,.74);background:rgba(255,255,255,.62);box-shadow:inset 0 1px 0 rgba(255,255,255,.9)}
 .theme-glass .link.featured{background:linear-gradient(145deg,rgba(255,255,255,.82),color-mix(in srgb,var(--accent) 9%,rgba(255,255,255,.58)));color:#115e45}
 .theme-glass .dropdown.featured summary{background:linear-gradient(145deg,rgba(255,255,255,.82),color-mix(in srgb,var(--accent) 9%,rgba(255,255,255,.58)));color:#115e45}

@@ -179,6 +179,48 @@ links:
 	}
 }
 
+func TestLoadStaticAssetsAndLocalImageURLsYAML(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "local-assets.yaml")
+	if err := os.WriteFile(path, []byte(`name: Local Assets
+avatar_url: /assets/avatar.png
+static_assets:
+  - source_path: local/profile/avatar.png
+    output_path: assets/avatar.png
+    content_type: image/png
+custom_icons:
+  - name: local_logo
+    label: Local Logo
+    url: /assets/logo.svg
+links:
+  - title: Website
+    url: https://example.com
+    icon_url: /assets/icon.svg
+    color: "#2563eb"
+  - title: Local Logo
+    url: https://example.com/logo
+    icon: local_logo
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AvatarURL != "/assets/avatar.png" {
+		t.Fatalf("avatar_url = %q", cfg.AvatarURL)
+	}
+	if len(cfg.StaticAssets) != 1 || cfg.StaticAssets[0].OutputPath != "assets/avatar.png" {
+		t.Fatalf("static assets = %#v", cfg.StaticAssets)
+	}
+	if cfg.Links[0].Color != "#2563eb" {
+		t.Fatalf("color = %q", cfg.Links[0].Color)
+	}
+	if HasExternalMedia(cfg) {
+		t.Fatal("root-relative image URLs should not count as external media")
+	}
+}
+
 func TestLoadRejectsAmbiguousFaviconSource(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.json")

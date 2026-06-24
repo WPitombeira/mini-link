@@ -80,6 +80,11 @@ func serve(args []string) error {
 		serveAssets = render.Assets{Favicons: favicon.Favicons}
 		servedAssetFiles = favicon.Assets
 	}
+	staticAssets, err := buildStaticAssets(cfg)
+	if err != nil {
+		return err
+	}
+	servedAssetFiles = append(servedAssetFiles, staticAssets...)
 	page, err := render.PageWithAssets(cfg, serveAssets)
 	if err != nil {
 		return err
@@ -167,6 +172,13 @@ func export(args []string) error {
 		return err
 	}
 	if err := writeAssets(*out, favicon.Assets); err != nil {
+		return err
+	}
+	staticAssets, err := buildStaticAssets(cfg)
+	if err != nil {
+		return err
+	}
+	if err := writeAssets(*out, staticAssets); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(*out, "site.webmanifest"), []byte(siteManifest(cfg, faviconLinks)), 0o644); err != nil {

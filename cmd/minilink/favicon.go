@@ -183,11 +183,37 @@ func initialsFaviconSVG(cfg config.Config) string {
 
 func writeAssets(out string, assets []assetFile) error {
 	for _, asset := range assets {
-		if err := os.WriteFile(filepath.Join(out, asset.Name), asset.Body, 0o644); err != nil {
+		target := filepath.Join(out, asset.Name)
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, asset.Body, 0o644); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func buildStaticAssets(cfg config.Config) ([]assetFile, error) {
+	assets := make([]assetFile, 0, len(cfg.StaticAssets))
+	for _, item := range cfg.StaticAssets {
+		body, err := os.ReadFile(filepath.Clean(item.SourcePath))
+		if err != nil {
+			return nil, err
+		}
+		contentType := item.ContentType
+		if contentType == "" {
+			contentType = contentTypeFromName(item.OutputPath)
+		}
+		if contentType == "" {
+			contentType = contentTypeFromName(item.SourcePath)
+		}
+		if contentType == "" {
+			contentType = http.DetectContentType(body)
+		}
+		assets = append(assets, assetFile{Name: item.OutputPath, ContentType: contentType, Body: body})
+	}
+	return assets, nil
 }
 
 func uploadAssets(ctx context.Context, upload config.AssetUpload, assets []assetFile) ([]render.FaviconLink, error) {
@@ -298,7 +324,12 @@ func siteManifest(cfg config.Config, favicons []render.FaviconLink) string {
 		if sizes == "" && favicon.Type == "image/svg+xml" {
 			sizes = "any"
 		}
-		icons = append(icons, fmt.Sprintf(`{"src":%q,"sizes":%q,"type":%q}`, favicon.Href, sizes, favicon.Type))
+		icon := fmt.Sprintf(`{"src":%q,"sizes":%q`, favicon.Href, sizes)
+		if favicon.Type != "" {
+			icon += fmt.Sprintf(`,"type":%q`, favicon.Type)
+		}
+		icon += "}"
+		icons = append(icons, icon)
 	}
 	return fmt.Sprintf(`{"name":%q,"short_name":%q,"icons":[%s],"start_url":"/","display":"standalone","background_color":"#ffffff","theme_color":%q}
 `, cfg.Title, cfg.Name, strings.Join(icons, ","), cfg.Accent)

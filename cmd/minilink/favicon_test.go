@@ -67,3 +67,29 @@ func TestBuildFaviconProcessesLocalImage(t *testing.T) {
 		t.Fatalf("missing png assets: %#v", names)
 	}
 }
+
+func TestBuildStaticAssets(t *testing.T) {
+	dir := t.TempDir()
+	source := filepath.Join(dir, "avatar.png")
+	if err := os.WriteFile(source, []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.StaticAssets = []config.StaticAsset{
+		{SourcePath: source, OutputPath: "assets/avatar.png"},
+	}
+
+	assets, err := buildStaticAssets(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(assets) != 1 {
+		t.Fatalf("assets = %d", len(assets))
+	}
+	if assets[0].Name != "assets/avatar.png" {
+		t.Fatalf("asset name = %q", assets[0].Name)
+	}
+	if assets[0].ContentType != "image/png" {
+		t.Fatalf("content type = %q", assets[0].ContentType)
+	}
+}

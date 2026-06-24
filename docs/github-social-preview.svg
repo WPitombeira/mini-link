@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Mini-Link social preview</title>
+  <desc id="desc">Mini-Link is a blazing-fast LittleLink alternative written in Go.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="0.46" stop-color="#eef6ff"/>
+      <stop offset="1" stop-color="#ecfdf5"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.72"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="28" stdDeviation="30" flood-color="#0f172a" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <g filter="url(#shadow)">
+    <rect x="92" y="70" width="1096" height="500" rx="42" fill="url(#card)" stroke="#ffffff" stroke-width="2"/>
+  </g>
+  <g transform="translate(150 132)">
+    <rect x="0" y="0" width="92" height="92" rx="24" fill="#0f172a"/>
+    <path d="M24 45h44v8H24v-8Zm0-16h44v8H24v-8Zm0 32h30v8H24v-8Z" fill="#ffffff"/>
+    <path d="M76 22 96 46 76 70" fill="none" stroke="#14b8a6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="150" y="292" fill="#0f172a" font-family="Arial" font-size="88" font-weight="800" letter-spacing="0">Mini-Link</text>
+  <text x="154" y="360" fill="#334155" font-family="Arial" font-size="34" font-weight="650" letter-spacing="0">Blazing-fast Go link-in-bio</text>
+  <text x="154" y="420" fill="#475569" font-family="Arial" font-size="27" font-weight="500" letter-spacing="0">No JS by default - Cloudflare-ready - MIT licensed</text>
+  <g transform="translate(154 478)">
+    <rect width="162" height="48" rx="24" fill="#dbeafe"/>
+    <text x="32" y="32" fill="#1d4ed8" font-family="Arial" font-size="21" font-weight="750">Go</text>
+    <rect x="184" width="236" height="48" rx="24" fill="#dcfce7"/>
+    <text x="216" y="32" fill="#047857" font-family="Arial" font-size="21" font-weight="750">Static export</text>
+    <rect x="444" width="286" height="48" rx="24" fill="#fef3c7"/>
+    <text x="476" y="32" fill="#b45309" font-family="Arial" font-size="21" font-weight="750">SEO-ready output</text>
+  </g>
+  <g transform="translate(930 156)">
+    <rect width="164" height="258" rx="82" fill="#0f172a"/>
+    <rect x="20" y="22" width="124" height="214" rx="62" fill="#111827"/>
+    <circle cx="82" cy="106" r="43" fill="#ffffff" opacity="0.16"/>
+    <path d="M63 158c14 13 24 17 38 17 16 0 28-8 43-22v47H63v-42Z" fill="#ffffff" opacity="0.18"/>
+  </g>
+</svg>

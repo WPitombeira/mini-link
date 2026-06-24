@@ -44,6 +44,7 @@ Then check:
 
 - `LICENSE` remains MIT.
 - `README.md`, `docs/configuration.md`, `docs/deployment.md`, and `docs/icons.md` match the current CLI.
+- `docs/github-discoverability.md`, `docs/github-social-preview.svg`, and `docs/github-social-preview.png` match the current positioning.
 - `docs/icons.html` is regenerated after icon changes.
 - `go test ./...` passes.
 - `go vet ./...` passes.

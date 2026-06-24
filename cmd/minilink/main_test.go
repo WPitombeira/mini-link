@@ -43,8 +43,11 @@ func TestWriteHTMLCacheValidation(t *testing.T) {
 
 func TestContentSecurityPolicyExternalImages(t *testing.T) {
 	strict := contentSecurityPolicy(false)
-	if strings.Contains(strict, "img-src") {
-		t.Fatalf("strict csp should not allow images: %s", strict)
+	if !strings.Contains(strict, "img-src 'self' data:") {
+		t.Fatalf("strict csp should allow local generated images: %s", strict)
+	}
+	if strings.Contains(strict, "https:") {
+		t.Fatalf("strict csp should not allow remote images: %s", strict)
 	}
 	withImages := contentSecurityPolicy(true)
 	if !strings.Contains(withImages, "img-src 'self' https: data:") {

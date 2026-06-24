@@ -20,6 +20,18 @@ type pageData struct {
 	Description string
 	Template    string
 	Schema      template.JS
+	Favicons    []FaviconLink
+}
+
+type FaviconLink struct {
+	Rel   string
+	Href  string
+	Type  string
+	Sizes string
+}
+
+type Assets struct {
+	Favicons []FaviconLink
 }
 
 type linkData struct {
@@ -32,6 +44,10 @@ type linkData struct {
 }
 
 func Page(cfg config.Config) ([]byte, error) {
+	return PageWithAssets(cfg, DefaultAssets(cfg))
+}
+
+func PageWithAssets(cfg config.Config, assets Assets) ([]byte, error) {
 	links := buildLinks(cfg.Links, customIconMap(cfg.CustomIcons))
 
 	data := pageData{
@@ -42,11 +58,23 @@ func Page(cfg config.Config) ([]byte, error) {
 		Description: description(cfg),
 		Template:    "theme-" + cfg.Template,
 		Schema:      template.JS(schemaJSON(cfg, links)),
+		Favicons:    assets.Favicons,
 	}
 
 	var buf bytes.Buffer
 	err := pageTemplate.Execute(&buf, data)
 	return buf.Bytes(), err
+}
+
+func DefaultAssets(cfg config.Config) Assets {
+	source := cfg.Favicon.SourceURL
+	if source == "" {
+		source = cfg.AvatarURL
+	}
+	if source != "" {
+		return Assets{Favicons: []FaviconLink{{Rel: "icon", Href: source}}}
+	}
+	return Assets{Favicons: []FaviconLink{{Rel: "icon", Href: "/favicon.svg", Type: "image/svg+xml"}}}
 }
 
 func buildLinks(links []config.Link, customIcons map[string]customIcon) []linkData {
@@ -209,6 +237,8 @@ var pageTemplate = template.Must(template.New("page").Parse(`{{define "linkItem"
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="{{.Config.Title}}">
 <meta name="twitter:description" content="{{.Description}}">
+{{range .Favicons}}<link rel="{{.Rel}}" href="{{.Href}}"{{if .Type}} type="{{.Type}}"{{end}}{{if .Sizes}} sizes="{{.Sizes}}"{{end}}>
+{{end}}<link rel="manifest" href="/site.webmanifest">
 <title>{{.Config.Title}}</title>
 <script type="application/ld+json">{{.Schema}}</script>
 <style>
@@ -230,6 +260,7 @@ main{width:min(100%,540px);min-height:min(820px,calc(100vh - 64px));display:grid
 .profile{display:grid;align-content:center;gap:24px}
 .identity{text-align:center;display:grid;justify-items:center;gap:14px}
 .avatar{width:96px;height:96px;border:2px solid var(--text);border-radius:999px;display:grid;place-items:center;background:#fff;color:var(--text);font-weight:780;font-size:36px;letter-spacing:0}
+.avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover;display:block}
 .theme-glass .avatar{border-color:rgba(255,255,255,.82);background:linear-gradient(145deg,rgba(255,255,255,.92),rgba(255,255,255,.58));box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 20px 44px rgba(15,23,42,.13)}
 .theme-terminal .avatar{border-color:#44d17c;background:#07110e;color:#8ff0b2;border-radius:14px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 h1{font-size:32px;line-height:1.08;margin:0 0 5px;font-weight:780;letter-spacing:0}
@@ -281,7 +312,7 @@ footer a{min-height:48px;display:inline-flex;align-items:center;color:var(--text
 </header>
 <section class="profile">
 <section class="identity" aria-label="Profile">
-<div class="avatar" aria-hidden="true">{{.Config.Avatar}}</div>
+<div class="avatar" aria-hidden="true">{{if .Config.AvatarURL}}<img src="{{.Config.AvatarURL}}" alt="" loading="eager" decoding="async">{{else}}{{.Config.Avatar}}{{end}}</div>
 <div>
 <h1>{{.Config.Name}}</h1>
 <p class="bio">{{.Config.Bio}}</p>

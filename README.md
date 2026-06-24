@@ -11,9 +11,10 @@ It uses only the Go standard library. The rendered page has inline CSS and inlin
 - strong ETag, Last-Modified, and CDN-friendly Cache-Control headers
 - precompiled inline SVG icon catalog
 - user-defined custom icons with inline SVG/path support
+- avatar image support plus export-time favicon generation
 - selectable `classic`, `glass`, and `terminal` templates
 - native dropdown groups without JavaScript
-- SEO-ready canonical, social metadata, JSON-LD, robots, sitemap, and `llms.txt` output
+- SEO-ready canonical, social metadata, JSON-LD, robots, sitemap, web manifest, favicon, and `llms.txt` output
 - Docker, Docker Compose, Cloudflare Pages, Cloudflare Workers/static assets, Vercel, and manual deployment docs
 - MIT license
 
@@ -73,6 +74,12 @@ go run ./cmd/minilink icons -out docs/icons.html
 Then open `docs/icons.html`. See [docs/icons.md](docs/icons.md).
 
 External icon URLs are supported with `icon_url`, but they add browser requests and require a looser image CSP. Use inline custom icons when performance is the priority.
+
+## Favicons and Avatars
+
+Set `avatar_url` to show a profile image. Static export can also download `avatar_url`, `favicon.source_url`, or `favicon.source_path`, then write optimized favicon files into `dist/`.
+
+If no favicon source is configured, Mini-Link creates a small SVG favicon from the profile initials. Optional S3-compatible upload is available for S3 and Cloudflare R2; for Cloudflare Pages and Workers Static Assets, the default recommendation is to keep generated assets in `dist/` and let Cloudflare serve/cache them with the site.
 
 ## Deployment
 

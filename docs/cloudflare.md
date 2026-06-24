@@ -1,6 +1,6 @@
 # Cloudflare Deployment
 
-Mini-Link is a good fit for Cloudflare because the exported site is static: `index.html`, `robots.txt`, `sitemap.xml`, `llms.txt`, and platform header files. Use Pages when you want the simplest Git-backed static deployment. Use Workers Static Assets when you want a Worker project and Wrangler-driven deploys.
+Mini-Link is a good fit for Cloudflare because the exported site is static: `index.html`, favicon assets, `site.webmanifest`, `robots.txt`, `sitemap.xml`, `llms.txt`, and platform header files. Use Pages when you want the simplest Git-backed static deployment. Use Workers Static Assets when you want a Worker project and Wrangler-driven deploys.
 
 ## Prepare the Site
 
@@ -21,6 +21,9 @@ ls dist
 Expected files:
 
 - `index.html`
+- `favicon.svg` or `favicon.png`
+- `apple-touch-icon.png` when the source is a raster image
+- `site.webmanifest`
 - `robots.txt`
 - `sitemap.xml`
 - `llms.txt`
@@ -71,6 +74,32 @@ directory = "./dist"
 ```
 
 Workers Static Assets should be used instead of legacy Workers Sites for new Worker-hosted static projects.
+
+## Favicon Assets: Static Assets vs R2
+
+For Mini-Link on Cloudflare Pages or Workers Static Assets, prefer regular generated files in `dist/`:
+
+- the favicon files are part of the deploy artifact
+- Cloudflare serves and caches them with the rest of the static site
+- there is no bucket, credential, or upload step to manage
+- deploys are reproducible because the HTML and favicon files ship together
+
+Use R2 only when you need the assets to live outside the Mini-Link build artifact, such as shared assets across many sites, runtime user uploads, or a bucket controlled by another pipeline.
+
+To upload generated favicon files to R2 during export, configure `asset_upload`:
+
+```yaml
+asset_upload:
+  provider: r2
+  endpoint: https://<account-id>.r2.cloudflarestorage.com
+  bucket: mini-link-assets
+  access_key_id: <R2_ACCESS_KEY_ID>
+  secret_access_key: <R2_SECRET_ACCESS_KEY>
+  public_base_url: https://assets.example.com
+  prefix: mini-link
+```
+
+YAML values are literal; Mini-Link does not expand `${...}` placeholders. Keep R2 secrets in `.env` or CI variables. Do not commit real access keys.
 
 ## Custom Domain
 

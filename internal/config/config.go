@@ -21,13 +21,32 @@ type Config struct {
 	Title        string       `json:"title"`
 	Bio          string       `json:"bio"`
 	Avatar       string       `json:"avatar"`
+	AvatarURL    string       `json:"avatar_url"`
 	BaseURL      string       `json:"base_url"`
 	Template     string       `json:"template"`
 	Accent       string       `json:"accent"`
 	Footer       string       `json:"footer"`
 	CacheSeconds int          `json:"cache_seconds"`
+	Favicon      Favicon      `json:"favicon,omitempty"`
+	AssetUpload  AssetUpload  `json:"asset_upload,omitempty"`
 	CustomIcons  []CustomIcon `json:"custom_icons,omitempty"`
 	Links        []Link       `json:"links"`
+}
+
+type Favicon struct {
+	SourceURL  string `json:"source_url"`
+	SourcePath string `json:"source_path"`
+}
+
+type AssetUpload struct {
+	Provider        string `json:"provider"`
+	Endpoint        string `json:"endpoint"`
+	Bucket          string `json:"bucket"`
+	Region          string `json:"region"`
+	AccessKeyID     string `json:"access_key_id"`
+	SecretAccessKey string `json:"secret_access_key"`
+	PublicBaseURL   string `json:"public_base_url"`
+	Prefix          string `json:"prefix"`
 }
 
 type Link struct {
@@ -112,10 +131,21 @@ func normalize(cfg Config) (Config, error) {
 	cfg.Title = strings.TrimSpace(cfg.Title)
 	cfg.Bio = strings.TrimSpace(cfg.Bio)
 	cfg.Avatar = strings.TrimSpace(cfg.Avatar)
+	cfg.AvatarURL = strings.TrimSpace(cfg.AvatarURL)
 	cfg.BaseURL = strings.TrimSpace(cfg.BaseURL)
 	cfg.Template = strings.TrimSpace(strings.ToLower(cfg.Template))
 	cfg.Accent = strings.TrimSpace(cfg.Accent)
 	cfg.Footer = strings.TrimSpace(cfg.Footer)
+	cfg.Favicon.SourceURL = strings.TrimSpace(cfg.Favicon.SourceURL)
+	cfg.Favicon.SourcePath = strings.TrimSpace(cfg.Favicon.SourcePath)
+	cfg.AssetUpload.Provider = strings.TrimSpace(strings.ToLower(cfg.AssetUpload.Provider))
+	cfg.AssetUpload.Endpoint = strings.TrimRight(strings.TrimSpace(cfg.AssetUpload.Endpoint), "/")
+	cfg.AssetUpload.Bucket = strings.TrimSpace(cfg.AssetUpload.Bucket)
+	cfg.AssetUpload.Region = strings.TrimSpace(cfg.AssetUpload.Region)
+	cfg.AssetUpload.AccessKeyID = strings.TrimSpace(cfg.AssetUpload.AccessKeyID)
+	cfg.AssetUpload.SecretAccessKey = strings.TrimSpace(cfg.AssetUpload.SecretAccessKey)
+	cfg.AssetUpload.PublicBaseURL = strings.TrimRight(strings.TrimSpace(cfg.AssetUpload.PublicBaseURL), "/")
+	cfg.AssetUpload.Prefix = strings.Trim(strings.TrimSpace(cfg.AssetUpload.Prefix), "/")
 	if cfg.Name == "" {
 		return Config{}, errors.New("name is required")
 	}
@@ -137,6 +167,17 @@ func normalize(cfg Config) (Config, error) {
 		if err := validateAbsoluteHTTPURL(cfg.BaseURL); err != nil {
 			return Config{}, fmt.Errorf("base_url: %w", err)
 		}
+	}
+	if cfg.AvatarURL != "" {
+		if err := validateAbsoluteHTTPURL(cfg.AvatarURL); err != nil {
+			return Config{}, fmt.Errorf("avatar_url: %w", err)
+		}
+	}
+	if err := normalizeFavicon(&cfg); err != nil {
+		return Config{}, err
+	}
+	if err := normalizeAssetUpload(&cfg); err != nil {
+		return Config{}, err
 	}
 	if cfg.Accent == "" {
 		cfg.Accent = "#0f766e"
@@ -168,6 +209,58 @@ func normalize(cfg Config) (Config, error) {
 		return Config{}, errors.New("at least one link is required")
 	}
 	return cfg, nil
+}
+
+func normalizeFavicon(cfg *Config) error {
+	if cfg.Favicon.SourceURL != "" && cfg.Favicon.SourcePath != "" {
+		return errors.New("favicon cannot define both source_url and source_path")
+	}
+	if cfg.Favicon.SourceURL != "" {
+		if err := validateAbsoluteHTTPURL(cfg.Favicon.SourceURL); err != nil {
+			return fmt.Errorf("favicon.source_url: %w", err)
+		}
+	}
+	return nil
+}
+
+func normalizeAssetUpload(cfg *Config) error {
+	if cfg.AssetUpload.Provider == "" {
+		return nil
+	}
+	switch cfg.AssetUpload.Provider {
+	case "s3", "r2":
+	default:
+		return errors.New("asset_upload.provider must be s3 or r2")
+	}
+	if cfg.AssetUpload.Endpoint == "" {
+		return errors.New("asset_upload.endpoint is required")
+	}
+	if err := validateAbsoluteHTTPURL(cfg.AssetUpload.Endpoint); err != nil {
+		return fmt.Errorf("asset_upload.endpoint: %w", err)
+	}
+	if cfg.AssetUpload.Bucket == "" {
+		return errors.New("asset_upload.bucket is required")
+	}
+	if cfg.AssetUpload.Region == "" {
+		if cfg.AssetUpload.Provider == "r2" {
+			cfg.AssetUpload.Region = "auto"
+		} else {
+			return errors.New("asset_upload.region is required")
+		}
+	}
+	if cfg.AssetUpload.AccessKeyID == "" {
+		return errors.New("asset_upload.access_key_id is required")
+	}
+	if cfg.AssetUpload.SecretAccessKey == "" {
+		return errors.New("asset_upload.secret_access_key is required")
+	}
+	if cfg.AssetUpload.PublicBaseURL == "" {
+		return errors.New("asset_upload.public_base_url is required")
+	}
+	if err := validateAbsoluteHTTPURL(cfg.AssetUpload.PublicBaseURL); err != nil {
+		return fmt.Errorf("asset_upload.public_base_url: %w", err)
+	}
+	return nil
 }
 
 func normalizeCustomIcons(input []CustomIcon) ([]CustomIcon, error) {
@@ -427,6 +520,9 @@ func merge(base Config, next Config) Config {
 	if next.Avatar != "" {
 		base.Avatar = next.Avatar
 	}
+	if next.AvatarURL != "" {
+		base.AvatarURL = next.AvatarURL
+	}
 	if next.BaseURL != "" {
 		base.BaseURL = next.BaseURL
 	}
@@ -441,6 +537,12 @@ func merge(base Config, next Config) Config {
 	}
 	if next.CacheSeconds != 0 {
 		base.CacheSeconds = next.CacheSeconds
+	}
+	if next.Favicon != (Favicon{}) {
+		base.Favicon = next.Favicon
+	}
+	if next.AssetUpload != (AssetUpload{}) {
+		base.AssetUpload = next.AssetUpload
 	}
 	if next.CustomIcons != nil {
 		base.CustomIcons = next.CustomIcons
@@ -466,10 +568,21 @@ func loadEnv(base Config, entries []string) (Config, error) {
 	cfg.Title = first(values, "MINI_LINK_TITLE", cfg.Title)
 	cfg.Bio = first(values, "MINI_LINK_BIO", cfg.Bio)
 	cfg.Avatar = first(values, "MINI_LINK_AVATAR", cfg.Avatar)
+	cfg.AvatarURL = first(values, "MINI_LINK_AVATAR_URL", cfg.AvatarURL)
 	cfg.BaseURL = first(values, "MINI_LINK_BASE_URL", cfg.BaseURL)
 	cfg.Template = first(values, "MINI_LINK_TEMPLATE", cfg.Template)
 	cfg.Accent = first(values, "MINI_LINK_ACCENT", cfg.Accent)
 	cfg.Footer = first(values, "MINI_LINK_FOOTER", cfg.Footer)
+	cfg.Favicon.SourceURL = first(values, "MINI_LINK_FAVICON_SOURCE_URL", cfg.Favicon.SourceURL)
+	cfg.Favicon.SourcePath = first(values, "MINI_LINK_FAVICON_SOURCE_PATH", cfg.Favicon.SourcePath)
+	cfg.AssetUpload.Provider = first(values, "MINI_LINK_ASSET_UPLOAD_PROVIDER", cfg.AssetUpload.Provider)
+	cfg.AssetUpload.Endpoint = first(values, "MINI_LINK_ASSET_UPLOAD_ENDPOINT", cfg.AssetUpload.Endpoint)
+	cfg.AssetUpload.Bucket = first(values, "MINI_LINK_ASSET_UPLOAD_BUCKET", cfg.AssetUpload.Bucket)
+	cfg.AssetUpload.Region = first(values, "MINI_LINK_ASSET_UPLOAD_REGION", cfg.AssetUpload.Region)
+	cfg.AssetUpload.AccessKeyID = first(values, "MINI_LINK_ASSET_UPLOAD_ACCESS_KEY_ID", cfg.AssetUpload.AccessKeyID)
+	cfg.AssetUpload.SecretAccessKey = first(values, "MINI_LINK_ASSET_UPLOAD_SECRET_ACCESS_KEY", cfg.AssetUpload.SecretAccessKey)
+	cfg.AssetUpload.PublicBaseURL = first(values, "MINI_LINK_ASSET_UPLOAD_PUBLIC_BASE_URL", cfg.AssetUpload.PublicBaseURL)
+	cfg.AssetUpload.Prefix = first(values, "MINI_LINK_ASSET_UPLOAD_PREFIX", cfg.AssetUpload.Prefix)
 	if raw := values["MINI_LINK_CACHE_SECONDS"]; raw != "" {
 		ttl, err := strconv.Atoi(raw)
 		if err != nil {
@@ -539,6 +652,16 @@ func HasExternalIcons(cfg Config) bool {
 		}
 	}
 	return linksHaveExternalIcons(cfg.Links)
+}
+
+func HasExternalMedia(cfg Config) bool {
+	if cfg.AvatarURL != "" {
+		return true
+	}
+	if cfg.Favicon.SourceURL != "" {
+		return true
+	}
+	return HasExternalIcons(cfg)
 }
 
 func linksHaveExternalIcons(links []Link) bool {

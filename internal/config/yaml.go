@@ -15,6 +15,8 @@ func parseYAML(raw string) (Config, error) {
 	var stack []linkFrame
 	inLinks := false
 	inCustomIcons := false
+	inFavicon := false
+	inAssetUpload := false
 
 	scanner := bufio.NewScanner(strings.NewReader(raw))
 	lineNo := 0
@@ -37,16 +39,58 @@ func parseYAML(raw string) (Config, error) {
 			if key == "links" {
 				inLinks = true
 				inCustomIcons = false
+				inFavicon = false
+				inAssetUpload = false
 				continue
 			}
 			if key == "custom_icons" {
 				inCustomIcons = true
 				inLinks = false
+				inFavicon = false
+				inAssetUpload = false
+				continue
+			}
+			if key == "favicon" {
+				inFavicon = true
+				inLinks = false
+				inCustomIcons = false
+				inAssetUpload = false
+				continue
+			}
+			if key == "asset_upload" {
+				inAssetUpload = true
+				inLinks = false
+				inCustomIcons = false
+				inFavicon = false
 				continue
 			}
 			inLinks = false
 			inCustomIcons = false
+			inFavicon = false
+			inAssetUpload = false
 			if err := setConfigScalar(&cfg, key, value); err != nil {
+				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
+			}
+			continue
+		}
+
+		if inFavicon {
+			key, value, ok := strings.Cut(trimmed, ":")
+			if !ok {
+				return Config{}, fmt.Errorf("line %d: expected key: value", lineNo)
+			}
+			if err := setFaviconScalar(&cfg.Favicon, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
+				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
+			}
+			continue
+		}
+
+		if inAssetUpload {
+			key, value, ok := strings.Cut(trimmed, ":")
+			if !ok {
+				return Config{}, fmt.Errorf("line %d: expected key: value", lineNo)
+			}
+			if err := setAssetUploadScalar(&cfg.AssetUpload, strings.TrimSpace(key), strings.TrimSpace(value)); err != nil {
 				return Config{}, fmt.Errorf("line %d: %w", lineNo, err)
 			}
 			continue
@@ -83,7 +127,7 @@ func parseYAML(raw string) (Config, error) {
 		}
 
 		if !inLinks {
-			return Config{}, fmt.Errorf("line %d: nested values are only supported under custom_icons or links", lineNo)
+			return Config{}, fmt.Errorf("line %d: nested values are only supported under favicon, asset_upload, custom_icons, or links", lineNo)
 		}
 		if strings.HasPrefix(trimmed, "- ") {
 			parent := currentParent(stack, indent)
@@ -168,6 +212,8 @@ func setConfigScalar(cfg *Config, key string, value string) error {
 		cfg.Bio = unquote(value)
 	case "avatar":
 		cfg.Avatar = unquote(value)
+	case "avatar_url":
+		cfg.AvatarURL = unquote(value)
 	case "base_url":
 		cfg.BaseURL = unquote(value)
 	case "template":
@@ -184,6 +230,42 @@ func setConfigScalar(cfg *Config, key string, value string) error {
 		cfg.CacheSeconds = ttl
 	default:
 		return fmt.Errorf("unknown key %q", key)
+	}
+	return nil
+}
+
+func setFaviconScalar(favicon *Favicon, key string, value string) error {
+	switch key {
+	case "source_url":
+		favicon.SourceURL = unquote(value)
+	case "source_path":
+		favicon.SourcePath = unquote(value)
+	default:
+		return fmt.Errorf("unknown favicon key %q", key)
+	}
+	return nil
+}
+
+func setAssetUploadScalar(upload *AssetUpload, key string, value string) error {
+	switch key {
+	case "provider":
+		upload.Provider = unquote(value)
+	case "endpoint":
+		upload.Endpoint = unquote(value)
+	case "bucket":
+		upload.Bucket = unquote(value)
+	case "region":
+		upload.Region = unquote(value)
+	case "access_key_id":
+		upload.AccessKeyID = unquote(value)
+	case "secret_access_key":
+		upload.SecretAccessKey = unquote(value)
+	case "public_base_url":
+		upload.PublicBaseURL = unquote(value)
+	case "prefix":
+		upload.Prefix = unquote(value)
+	default:
+		return fmt.Errorf("unknown asset_upload key %q", key)
 	}
 	return nil
 }

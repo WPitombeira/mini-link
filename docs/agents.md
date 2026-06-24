@@ -27,11 +27,13 @@ go run ./cmd/minilink serve -addr :8080 -config examples/mini-link.yaml
 Then check:
 
 - `/` renders the profile and all links.
+- `/favicon.svg` or `/favicon.png` returns the generated favicon.
+- `/site.webmanifest` returns valid JSON and references existing icon files.
 - a featured link has distinct styling.
 - dropdown groups open and close with mouse and keyboard.
 - SVG icons render inline.
 - custom inline icons render without extra requests.
-- external icon URLs render only when configured and CSP includes `img-src`.
+- external icon, avatar, and favicon URLs render only when configured and CSP includes `https:` in `img-src`.
 - link clicks navigate to the expected targets.
 - refreshing with `If-None-Match` returns `304`.
 - mobile width has no overflow.

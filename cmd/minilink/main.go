@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"flag"
@@ -69,13 +70,23 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	page, err := render.Page(cfg)
+	serveAssets := render.DefaultAssets(cfg)
+	servedAssetFiles := []assetFile{{Name: "favicon.svg", ContentType: "image/svg+xml", Body: []byte(initialsFaviconSVG(cfg))}}
+	if cfg.Favicon.SourcePath != "" {
+		favicon, err := buildFavicon(context.Background(), cfg)
+		if err != nil {
+			return err
+		}
+		serveAssets = render.Assets{Favicons: favicon.Favicons}
+		servedAssetFiles = favicon.Assets
+	}
+	page, err := render.PageWithAssets(cfg, serveAssets)
 	if err != nil {
 		return err
 	}
 	etag := strongETag(page)
 	started := time.Now().UTC()
-	allowExternalImages := config.HasExternalIcons(cfg)
+	allowExternalImages := config.HasExternalMedia(cfg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -93,6 +104,15 @@ func serve(args []string) error {
 	})
 	mux.HandleFunc("/llms.txt", func(w http.ResponseWriter, r *http.Request) {
 		writeText(w, []byte(llmsTXT(cfg)), "text/markdown; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
+	})
+	for _, asset := range servedAssetFiles {
+		asset := asset
+		mux.HandleFunc("/"+asset.Name, func(w http.ResponseWriter, r *http.Request) {
+			writeText(w, asset.Body, asset.ContentType, cfg.CacheSeconds, allowExternalImages)
+		})
+	}
+	mux.HandleFunc("/site.webmanifest", func(w http.ResponseWriter, r *http.Request) {
+		writeText(w, []byte(siteManifest(cfg, serveAssets.Favicons)), "application/manifest+json; charset=utf-8", cfg.CacheSeconds, allowExternalImages)
 	})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
@@ -124,7 +144,19 @@ func export(args []string) error {
 	if err != nil {
 		return err
 	}
-	page, err := render.Page(cfg)
+	favicon, err := buildFavicon(context.Background(), cfg)
+	if err != nil {
+		return err
+	}
+	faviconLinks := favicon.Favicons
+	if cfg.AssetUpload.Provider != "" {
+		uploadedLinks, err := uploadAssets(context.Background(), cfg.AssetUpload, favicon.Assets)
+		if err != nil {
+			return err
+		}
+		faviconLinks = uploadedLinks
+	}
+	page, err := render.PageWithAssets(cfg, render.Assets{Favicons: faviconLinks})
 	if err != nil {
 		return err
 	}
@@ -134,7 +166,13 @@ func export(args []string) error {
 	if err := os.WriteFile(filepath.Join(*out, "index.html"), page, 0o644); err != nil {
 		return err
 	}
-	allowExternalImages := config.HasExternalIcons(cfg)
+	if err := writeAssets(*out, favicon.Assets); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(*out, "site.webmanifest"), []byte(siteManifest(cfg, faviconLinks)), 0o644); err != nil {
+		return err
+	}
+	allowExternalImages := config.HasExternalMedia(cfg) || cfg.AssetUpload.Provider != ""
 	if err := os.WriteFile(filepath.Join(*out, "_headers"), []byte(headersFile(cfg.CacheSeconds, allowExternalImages)), 0o644); err != nil {
 		return err
 	}
@@ -267,9 +305,9 @@ func securityHeaders(header http.Header, allowExternalImages bool) {
 }
 
 func contentSecurityPolicy(allowExternalImages bool) string {
-	policy := "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	policy := "default-src 'none'; connect-src 'self'; style-src 'unsafe-inline'; script-src 'none'; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 	if allowExternalImages {
-		policy += "; img-src 'self' https: data:"
+		policy = strings.Replace(policy, "img-src 'self' data:", "img-src 'self' https: data:", 1)
 	}
 	return policy
 }

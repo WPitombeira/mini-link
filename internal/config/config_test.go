@@ -139,6 +139,70 @@ links:
 	}
 }
 
+func TestLoadFaviconAndAssetUploadYAML(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "assets.yaml")
+	if err := os.WriteFile(path, []byte(`name: Asset Profile
+avatar_url: https://cdn.example.com/avatar.png
+favicon:
+  source_url: https://cdn.example.com/source.png
+asset_upload:
+  provider: r2
+  endpoint: https://account.r2.cloudflarestorage.com
+  bucket: mini-link
+  access_key_id: test-key
+  secret_access_key: test-secret
+  public_base_url: https://assets.example.com
+  prefix: profiles/wp
+links:
+  - title: Website
+    url: https://example.com
+    icon: globe
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AvatarURL != "https://cdn.example.com/avatar.png" {
+		t.Fatalf("avatar_url = %q", cfg.AvatarURL)
+	}
+	if cfg.Favicon.SourceURL != "https://cdn.example.com/source.png" {
+		t.Fatalf("favicon.source_url = %q", cfg.Favicon.SourceURL)
+	}
+	if cfg.AssetUpload.Provider != "r2" || cfg.AssetUpload.Region != "auto" {
+		t.Fatalf("upload = %#v", cfg.AssetUpload)
+	}
+	if !HasExternalMedia(cfg) {
+		t.Fatal("expected external media")
+	}
+}
+
+func TestLoadRejectsAmbiguousFaviconSource(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.json")
+	if err := os.WriteFile(path, []byte(`{
+  "name": "Bad Favicon",
+  "favicon": {
+    "source_url": "https://example.com/avatar.png",
+    "source_path": "avatar.png"
+  },
+  "links": [
+    {
+      "title": "Website",
+      "url": "https://example.com",
+      "icon": "globe"
+    }
+  ]
+}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected ambiguous favicon source error")
+	}
+}
+
 func TestLoadDropdownExamples(t *testing.T) {
 	for _, name := range []string{"dropdowns.yaml", "dropdowns.json"} {
 		cfg, err := Load(filepath.Join("..", "..", "examples", name))
